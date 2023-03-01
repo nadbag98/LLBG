@@ -48,7 +48,7 @@ def report(
         test_label_acc = count_integer_overlap(
             reconstructed_user_data["labels"].view(-1),
             true_user_data["labels"].view(-1),
-            # maxlength=cfg_case.data.vocab_size,
+            maxlength=cfg_case.data.vocab_size,
         ).item()
     else:
         test_label_acc = 0

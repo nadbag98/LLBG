@@ -281,9 +281,6 @@ def dump_metrics(cfg, metrics):
     filepath = f"metrics_{cfg.case.data.name}_{cfg.case.model}_user{cfg.case.user.user_idx}.yaml"
     sanitized_metrics = dict()
     for metric, val in metrics.items():
-        # TODO: find out why some metrics are tensors
-        if torch.is_tensor(val):
-            val = val.cpu()
         try:
             sanitized_metrics[metric] = np.asarray(val).item()
         except ValueError:
