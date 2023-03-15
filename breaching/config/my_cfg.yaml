@@ -2,8 +2,8 @@
 # Configuration defaults
 # Settings are separated into case, attack analysis
 defaults:
-  - case: 2_single_imagenet
-  - attack: invertinggradients
+  - case: 6.2_large_batch_cifar_win
+  - attack: iterativedlbg
   - _self_
   - override hydra/job_logging: custom
 
@@ -19,11 +19,11 @@ hydra:
 #   - pkg://
 
 seed: # Optional: Set initial seed
-name: default # A name for this run [will be used for the summary table and outputs folder]
+name: my_run # A name for this run [will be used for the summary table and outputs folder]
 
 # debug implementation by running every loop just once:
-dryrun: False
+dryrun: True
 
 # When benchmarking:
 num_trials: 100
-save_reconstruction: False
+save_reconstruction: True

@@ -90,58 +90,89 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
 
     def _run_trial(self, rec_model, shared_data, labels, stats, trial, initial_data=None, dryrun=False):
         """Run a single reconstruction trial."""
-
         # Initialize losses:
         for regularizer in self.regularizers:
             regularizer.initialize(rec_model, shared_data, labels)
         self.objective.initialize(self.loss_fn, self.cfg.impl, shared_data[0]["metadata"]["local_hyperparams"])
 
-        # Initialize candidate reconstruction data
-        candidate = self._initialize_data([shared_data[0]["metadata"]["num_data_points"], *self.data_shape])
-        if initial_data is not None:
-            candidate.data = initial_data.data.clone().to(**self.setup)
+        num_data_points = shared_data[0]["metadata"]["num_data_points"]
+        last_bias_grad = shared_data[0]["gradients"][-1]
+        rec_labels = (last_bias_grad < 0).nonzero().view(-1)
 
-        best_candidate = candidate.detach().clone()
-        minimal_value_so_far = torch.as_tensor(float("inf"), **self.setup)
-
-        # Initialize optimizers
-        optimizer, scheduler = self._init_optimizer([candidate])
-        current_wallclock = time.time()
         try:
-            for iteration in range(self.cfg.optim.max_iterations):
-                closure = self._compute_objective(candidate, labels, rec_model, optimizer, shared_data, iteration)
-                objective_value, task_loss = optimizer.step(closure), self.current_task_loss
-                scheduler.step()
+            # this is the iterative part
+            while torch.numel(rec_labels) <= num_data_points:
+                # we init the optimization process each time we reconstruct more labels
+                candidate = self._initialize_data([torch.numel(rec_labels), *self.data_shape])
+                best_candidate = candidate.detach().clone()
+                minimal_value_so_far = torch.as_tensor(float("inf"), **self.setup)
 
-                with torch.no_grad():
-                    # Project into image space
-                    if self.cfg.optim.boxed:
-                        candidate.data = torch.max(torch.min(candidate, (1 - self.dm) / self.ds), -self.dm / self.ds)
-                    if objective_value < minimal_value_so_far:
-                        minimal_value_so_far = objective_value.detach()
-                        best_candidate = candidate.detach().clone()
+                optimizer, scheduler = self._init_optimizer([candidate])
+                current_wallclock = time.time()
+                # TODO: decide whether should be max iterations, or max iterarions divided by num data points
+                for iteration in range(self.cfg.optim.max_iterations):
+                    closure = self._compute_objective(candidate, labels, rec_model, optimizer, shared_data, iteration)
+                    objective_value, task_loss = optimizer.step(closure), self.current_task_loss
+                    scheduler.step()
 
-                if iteration + 1 == self.cfg.optim.max_iterations or iteration % self.cfg.optim.callback == 0:
-                    timestamp = time.time()
-                    log.info(
-                        f"| It: {iteration + 1} | Rec. loss: {objective_value.item():2.4f} | "
-                        f" Task loss: {task_loss.item():2.4f} | T: {timestamp - current_wallclock:4.2f}s"
-                    )
-                    current_wallclock = timestamp
+                    with torch.no_grad():
+                        # Project into image space
+                        if self.cfg.optim.boxed:
+                            candidate.data = torch.max(torch.min(candidate, (1 - self.dm) / self.ds),
+                                                       -self.dm / self.ds)
+                        if objective_value < minimal_value_so_far:
+                            minimal_value_so_far = objective_value.detach()
+                            best_candidate = candidate.detach().clone()
 
-                if not torch.isfinite(objective_value):
-                    log.info(f"Recovery loss is non-finite in iteration {iteration}. Cancelling reconstruction!")
+                    if iteration + 1 == self.cfg.optim.max_iterations or iteration % self.cfg.optim.callback == 0:
+                        timestamp = time.time()
+                        log.info(
+                            f"| It: {iteration + 1} for {torch.numel(rec_labels)}/{num_data_points} points "
+                            f"| Rec. loss: {objective_value.item():2.4f} | "
+                            f" Task loss: {task_loss.item():2.4f} | T: {timestamp - current_wallclock:4.2f}s"
+                        )
+                        current_wallclock = timestamp
+
+                    if not torch.isfinite(objective_value):
+                        log.info(f"Recovery loss is non-finite in iteration {iteration}. Cancelling reconstruction!")
+                        break
+
+                    stats[f"Trial_{trial}_Val"].append(objective_value.item())
+
+                    if dryrun:
+                        break
+
+                # if we already reconstructed all labels and data, we exit reconstruction loop and return candidate
+                if torch.numel(rec_labels) == num_data_points:
                     break
+                else:
+                    # if we don't have all the labels, we reconstruct more and then reconstruct data again
+                    rec_labels = self._get_additional_labels(rec_model, best_candidate, rec_labels,
+                                                             last_bias_grad, num_data_points)
 
-                stats[f"Trial_{trial}_Val"].append(objective_value.item())
-
-                if dryrun:
-                    break
         except KeyboardInterrupt:
             print(f"Recovery interrupted manually in iteration {iteration}!")
             pass
 
-        return best_candidate.detach()
+        return best_candidate.detach(), rec_labels
+
+    def _get_additional_labels(self, models, rec_data, rec_labels, last_bias_grad, num_data_points):
+        # TODO: expand to support multiple models (in rec_model)
+        attacked_model = models[0]
+        best_cand_out = attacked_model(rec_data)
+        best_cand_loss = self.loss_fn(best_cand_out, rec_labels)
+        all_params = [param for param in attacked_model.parameters()]
+        new_bias_grad = torch.autograd.grad(best_cand_loss, all_params[-1])
+        corrected_bias_grad = last_bias_grad - new_bias_grad[0]
+
+        # if corrected bias gradient has negative labels - we take them all
+        # TODO: take most negative first, in case we got too many labels here
+        new_labels = (corrected_bias_grad < 0).nonzero().view(-1)
+        if torch.numel(new_labels) == 0:
+            # if all indices of corrected gradient are positive - take argmin
+            new_labels = torch.argmin(corrected_bias_grad)
+        # try to fill reconstructed labels tensor, until reached num_data_points
+        return torch.cat((rec_labels, new_labels[:num_data_points - torch.numel(rec_labels)]))
 
     # def _compute_objective(self, candidate, labels, rec_model, optimizer, shared_data, iteration):
     #     def closure():
