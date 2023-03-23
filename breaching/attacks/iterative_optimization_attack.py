@@ -68,7 +68,8 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
         candidate_solutions, candidate_labels = [], []
         try:
             for trial in range(self.cfg.restarts.num_trials):
-                rec_data, rec_labels = self._run_trial(rec_models, shared_data, labels, stats, trial, initial_data, dryrun)
+                rec_data, rec_labels = self._run_trial(rec_models, shared_data, labels, stats, trial, initial_data,
+                                                       dryrun)
                 candidate_solutions.append(rec_data)
                 candidate_labels.append(rec_labels)
                 scores[trial] = self._score_trial(rec_data, rec_labels, rec_models, shared_data)
@@ -76,7 +77,6 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
             print("Trial procedure manually interruped.")
             pass
         optimal_solution, opt_ind = self._select_optimal_reconstruction(candidate_solutions, scores, stats)
-        # TODO: we add to these labels iteratively
         reconstructed_data = dict(data=optimal_solution, labels=candidate_labels[opt_ind])
         if server_payload[0]["metadata"].modality == "text":
             reconstructed_data = self._postprocess_text_data(reconstructed_data)
@@ -91,9 +91,10 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
     def _run_trial(self, rec_model, shared_data, labels, stats, trial, initial_data=None, dryrun=False):
         """Run a single reconstruction trial."""
         # Initialize losses:
+        # TODO: initialize without all labels
         for regularizer in self.regularizers:
             regularizer.initialize(rec_model, shared_data, labels)
-        self.objective.initialize(self.loss_fn, self.cfg.impl, shared_data[0]["metadata"]["local_hyperparams"])
+        # self.objective.initialize(self.loss_fn, self.cfg.impl, shared_data[0]["metadata"]["local_hyperparams"])
 
         num_data_points = shared_data[0]["metadata"]["num_data_points"]
         last_bias_grad = shared_data[0]["gradients"][-1]
@@ -107,11 +108,13 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
                 best_candidate = candidate.detach().clone()
                 minimal_value_so_far = torch.as_tensor(float("inf"), **self.setup)
 
+                # TODO: make sure initializing here instead of before try is ok
+                self.objective.initialize(self.loss_fn, self.cfg.impl)
                 optimizer, scheduler = self._init_optimizer([candidate])
                 current_wallclock = time.time()
-                # TODO: decide whether should be max iterations, or max iterarions divided by num data points
                 for iteration in range(self.cfg.optim.max_iterations):
-                    closure = self._compute_objective(candidate, labels, rec_model, optimizer, shared_data, iteration)
+                    closure = self._compute_objective(candidate, rec_labels, rec_model, optimizer, shared_data,
+                                                      iteration)
                     objective_value, task_loss = optimizer.step(closure), self.current_task_loss
                     scheduler.step()
 
@@ -163,7 +166,10 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
         best_cand_loss = self.loss_fn(best_cand_out, rec_labels)
         all_params = [param for param in attacked_model.parameters()]
         new_bias_grad = torch.autograd.grad(best_cand_loss, all_params[-1])
-        corrected_bias_grad = last_bias_grad - new_bias_grad[0]
+        # TODO: test with this normalization
+        # we subtract the relative part of the gradients from the original
+        corrected_bias_grad = last_bias_grad - \
+                              (torch.numel(rec_labels) / num_data_points) * new_bias_grad[0]
 
         # if corrected bias gradient has negative labels - we take them all
         # TODO: take most negative first, in case we got too many labels here
