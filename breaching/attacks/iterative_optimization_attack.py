@@ -103,6 +103,7 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
         try:
             # this is the iterative part
             while torch.numel(rec_labels) <= num_data_points:
+                log.info(f"Recovered labels {rec_labels.tolist()} through iterative strategy.")
                 # we init the optimization process each time we reconstruct more labels
                 candidate = self._initialize_data([torch.numel(rec_labels), *self.data_shape])
                 best_candidate = candidate.detach().clone()
