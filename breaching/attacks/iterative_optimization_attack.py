@@ -62,6 +62,9 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
 
     def reconstruct(self, server_payload, shared_data, server_secrets=None, initial_data=None, dryrun=False):
         # Initialize stats module for later usage:
+        # set all labels to 0, so prepare attack func doesn't reconstruct them
+        num_points = shared_data[0]["metadata"]["num_data_points"]
+        shared_data[0]["metadata"]["labels"] = torch.zeros(num_points)
         rec_models, labels, stats = self.prepare_attack(server_payload, shared_data)
         # Main reconstruction loop starts here:
         scores = torch.zeros(self.cfg.restarts.num_trials)
