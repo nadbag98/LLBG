@@ -1,5 +1,6 @@
 """Additional torchvision-like datasets."""
 
+import random
 import torch
 import torchvision
 
@@ -104,6 +105,29 @@ def _split_dataset_vision(dataset, cfg_data, user_idx=None, return_full_dataset=
         elif cfg_data.partition == "unique-class":
             data_ids = [idx for (idx, label) in dataset.lookup.items() if label == user_idx]
             dataset = Subset(dataset, data_ids)
+        elif cfg_data.partition == "imbalanced":
+            # TODO: implement for multiple users, more than single batch
+            data_ids = []
+            bs = cfg_data.batch_size
+            # half of each batch is the same class
+            cls_a = torch.randint(0, cfg_data.classes, (1,))
+            cls_a_inds = [idx for (idx, label) in dataset.lookup.items() if label == cls_a]
+            random.shuffle(cls_a_inds)
+            data_ids += cls_a_inds[: bs // 2]
+
+            # another quarter is a different class
+            cls_b = torch.randint(0, cfg_data.classes, (1,))
+            cls_b_inds = [idx for (idx, label) in dataset.lookup.items() if label == cls_b]
+            random.shuffle(cls_b_inds)
+            data_ids += cls_b_inds[: bs // 4]
+
+            # rest of batch is random
+            random_inds = torch.randint(0, len(dataset), (bs - len(data_ids),))
+            # random_inds = random.choices(list(dataset.lookup.keys()), k=bs - len(data_ids))
+            data_ids += random_inds
+            
+            dataset = Subset(dataset, data_ids)
+            
         elif cfg_data.partition == "mixup":
             if "mixup_freq" in cfg_data:
                 mixup_freq = cfg_data.mixup_freq
