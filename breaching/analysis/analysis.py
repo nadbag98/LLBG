@@ -50,7 +50,7 @@ def report(
             true_user_data["labels"].view(-1),
             # maxlength=cfg_case.data.vocab_size,
         ).item()
-        log.info(f"true labels: {true_user_data['labels'].sort()[0]}")
+        log.info(f"true labels: {true_user_data['labels'].sort()[0].cpu().tolist()}")
     else:
         test_label_acc = 0
 
