@@ -115,7 +115,10 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
                 self.objective.initialize(self.loss_fn, self.cfg.impl)
                 optimizer, scheduler = self._init_optimizer([candidate])
                 current_wallclock = time.time()
-                for iteration in range(self.cfg.optim.max_iterations):
+
+                # we have a different max iterations for the last iteration, where we reconstruct data
+                curr_iterations_num = self.cfg.optim.max_iterations if torch.numel(rec_labels) == num_data_points else self.cfg.optim.max_iterative_iterations
+                for iteration in range(curr_iterations_num):
                     closure = self._compute_objective(candidate, rec_labels, rec_model, optimizer, shared_data,
                                                       iteration)
                     objective_value, task_loss = optimizer.step(closure), self.current_task_loss
@@ -130,7 +133,7 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
                             minimal_value_so_far = objective_value.detach()
                             best_candidate = candidate.detach().clone()
 
-                    if iteration + 1 == self.cfg.optim.max_iterations or iteration % self.cfg.optim.callback == 0:
+                    if iteration + 1 == curr_iterations_num or iteration % self.cfg.optim.callback == 0:
                         timestamp = time.time()
                         log.info(
                             f"| It: {iteration + 1} for {torch.numel(rec_labels)}/{num_data_points} points "
