@@ -97,22 +97,21 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
         # TODO: initialize without all labels
         for regularizer in self.regularizers:
             regularizer.initialize(rec_model, shared_data, labels)
-        # self.objective.initialize(self.loss_fn, self.cfg.impl, shared_data[0]["metadata"]["local_hyperparams"])
 
         num_data_points = shared_data[0]["metadata"]["num_data_points"]
         last_bias_grad = shared_data[0]["gradients"][-1]
+        log.info(f"Bias gradient before augmentation: {last_bias_grad}")
         rec_labels = (last_bias_grad < 0).nonzero().view(-1)
 
         try:
             # this is the iterative part
             while torch.numel(rec_labels) <= num_data_points:
-                log.info(f"Recovered labels {rec_labels.tolist()} through iterative strategy.")
+                log.info(f"Recovered labels {sorted(rec_labels.tolist())} through iterative strategy.")
                 # we init the optimization process each time we reconstruct more labels
                 candidate = self._initialize_data([torch.numel(rec_labels), *self.data_shape])
                 best_candidate = candidate.detach().clone()
                 minimal_value_so_far = torch.as_tensor(float("inf"), **self.setup)
 
-                # TODO: make sure initializing here instead of before try is ok
                 self.objective.initialize(self.loss_fn, self.cfg.impl)
                 optimizer, scheduler = self._init_optimizer([candidate])
                 current_wallclock = time.time()
@@ -174,6 +173,7 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
         # we subtract the relative part of the gradients from the original
         corrected_bias_grad = last_bias_grad - \
                               (torch.numel(rec_labels) / num_data_points) * new_bias_grad[0]
+        log.info(f"Corrected bias gradient with {torch.numel(rec_labels)} known labels: {corrected_bias_grad}")
 
         # if corrected bias gradient has negative labels - we take them all
         # TODO: take most negative first, in case we got too many labels here
