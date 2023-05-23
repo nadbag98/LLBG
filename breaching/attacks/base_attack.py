@@ -447,6 +447,25 @@ class _BaseAttacker:
                 average_bias[selected_idx] -= m_impact
             labels = torch.stack(label_list).view(num_data_points, self.data_shape[0])
 
+        elif self.cfg.label_strategy == "bias-theory":  
+            # our variant of Wainakh's attack using bias gradient and theoretical value for impact
+            bias_per_query = [shared_data["gradients"][-1] for shared_data in user_data]
+            label_list = []
+            # Stage 1
+            average_bias = torch.stack(bias_per_query).mean(dim=0)
+            valid_classes = (average_bias < 0).nonzero()
+            label_list += [*valid_classes.squeeze(dim=-1)]
+            # here is the difference from bias-corrected: impact is independant of gradient
+            m_impact = - 1 / num_data_points
+
+            average_bias[valid_classes] = average_bias[valid_classes] - m_impact
+            # Stage 2
+            while len(label_list) < num_data_points:
+                selected_idx = average_bias.argmin()
+                label_list.append(selected_idx)
+                average_bias[selected_idx] -= m_impact
+            labels = torch.stack(label_list)
+
         elif self.cfg.label_strategy == "random":
             # A random baseline
             labels = torch.randint(0, num_classes, (num_data_points,), device=self.setup["device"])
