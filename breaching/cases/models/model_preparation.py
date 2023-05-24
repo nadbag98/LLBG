@@ -236,6 +236,20 @@ def _construct_vision_model(cfg_model, cfg_data, pretrained=True, **kwargs):
             elif "linear" == cfg_model:
                 input_dim = cfg_data.shape[0] * cfg_data.shape[1] * cfg_data.shape[2]
                 model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(input_dim, classes))
+
+            elif "vgg" in cfg_model.lower() and cfg_data.name == "TinyImageNet":
+                model = VGG(
+                    cfg_model,
+                    in_channels=channels,
+                    num_classes=classes,
+                    norm="BatchNorm2d",
+                    nonlin="ReLU",
+                    head="TinyImageNet",
+                    convolution_type="Standard",
+                    drop_rate=0,
+                    classical_weight_init=True,
+                )
+            
             elif "none" == cfg_model:
                 model = torch.nn.Sequential(torch.nn.Flatten(), _Select(classes))
             else:
