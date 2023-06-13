@@ -1,7 +1,7 @@
-name: large_batch_tiny_imagenet
+name: large_batch_imagenet
 
 defaults:
-  - data: TinyImageNet
+  - data: ImageNet
   - impl: default
   - server: honest-but-curious
   - user: local_gradient
