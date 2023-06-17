@@ -5,6 +5,7 @@ Inherit from this class for a consistent interface with attack cases."""
 import torch
 from collections import defaultdict
 import copy
+import pickle
 
 from .auxiliaries.common import optimizer_lookup
 from ..cases.models.transformer_dictionary import lookup_grad_indices
@@ -27,6 +28,9 @@ class _BaseAttacker:
         self.setup = dict(device=setup["device"], dtype=getattr(torch, cfg_attack.impl.dtype))
         self.model_template = copy.deepcopy(model)
         self.loss_fn = copy.deepcopy(loss_fn)
+        # read the dictionary in the file "vgg19_imagenet_avg_confs.pkl" into self.conf_stats
+        with open(f"vgg19_imagenet_avg_confs.pkl", "rb") as f:
+            self.conf_stats = pickle.load(f) 
 
     def reconstruct(self, server_payload, shared_data, server_secrets=None, dryrun=False):
         """Overwrite this function to implement a new attack."""
@@ -458,12 +462,16 @@ class _BaseAttacker:
             # here is the difference from bias-corrected: impact is independant of gradient
             m_impact = - 1 / num_data_points
 
-            average_bias[valid_classes] = average_bias[valid_classes] - m_impact
+            for cls in valid_classes:
+                model_conf = self.conf_stats[cls.item()]
+                average_bias[cls] -= m_impact * model_conf
+            # average_bias[valid_classes] = average_bias[valid_classes] - m_impact
             # Stage 2
             while len(label_list) < num_data_points:
                 selected_idx = average_bias.argmin()
+                model_conf = self.conf_stats[selected_idx.item()]
                 label_list.append(selected_idx)
-                average_bias[selected_idx] -= m_impact
+                average_bias[selected_idx] -= m_impact * model_conf
             labels = torch.stack(label_list)
 
         elif self.cfg.label_strategy == "random":
