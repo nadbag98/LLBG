@@ -6,8 +6,8 @@ from omegaconf import OmegaConf
 from breaching.cases.data.datasets_vision import _get_meanstd, _parse_data_augmentations
 import pickle
 
-# device = torch.device(f"cuda:0")
-device = torch.device("cpu")
+device = torch.device(f"cuda:0")
+#device = torch.device("cpu")
 
 @hydra.main(config_path="breaching/config", config_name="my_cfg", version_base="1.1")
 def main_launcher(cfg):
@@ -16,7 +16,7 @@ def main_launcher(cfg):
     model = getattr(torchvision.models, "vgg19")(pretrained=True)
     model.to(device)
     dataset = torchvision.datasets.ImageNet(
-            root=cfg.case.data.path, split="train" , transform=_default_t,
+            root=cfg.case.data.path, split="val" , transform=_default_t,
         )
     dataset.lookup = dict(zip(list(range(len(dataset))), [label for (_, label) in dataset.samples]))
 
@@ -25,7 +25,7 @@ def main_launcher(cfg):
         cfg.case.data.mean = data_mean
         cfg.case.data.std = data_std
 
-    transforms = _parse_data_augmentations(cfg.case.data, "train")
+    transforms = _parse_data_augmentations(cfg.case.data, "val")
 
     # Apply transformations
     dataset.transform = transforms if transforms is not None else None
@@ -40,6 +40,7 @@ def main_launcher(cfg):
 
     # print(len(dataset))
     avg_confs = {}
+    std_confs = {}
     samples_per_class = 64
     for ind in range(1000):
         indices = [idx for (idx, label) in dataset.lookup.items() if label == ind][:samples_per_class]
@@ -50,12 +51,17 @@ def main_launcher(cfg):
         outputs = model(inputs)
         outputs = outputs.softmax(dim=1).cpu()
         ind_avg_conf = outputs[:, ind].mean()
+        ind_std_conf = outputs[:, ind].std()
         avg_confs[ind] = ind_avg_conf.item()
-        print(f"{ind}: {ind_avg_conf}")
+        std_confs[ind] = ind_std_conf.item()
+        print(f"{ind}: {ind_avg_conf.item()} +- {ind_std_conf.item()}")
     
     # save avg_confs to a file named "vgg19_imagenet_avg_confs.pkl"
     with open("vgg19_imagenet_avg_confs.pkl", "wb") as f:
         pickle.dump(avg_confs, f)
+       
+    with open("vgg19_imagenet_std_confs.pkl", "wb") as f:
+        pickle.dump(std_confs, f)
 
 
     # for i in range(10):

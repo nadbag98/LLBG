@@ -176,7 +176,7 @@ class IterativeOptimizationAttacker(OptimizationBasedAttacker):
         # we subtract the relative part of the gradients from the original
         corrected_bias_grad = last_bias_grad - \
                               (torch.numel(rec_labels) / num_data_points) * new_bias_grad[0]
-        log.info(f"Corrected bias gradient with {torch.numel(rec_labels)} known labels: {corrected_bias_grad}")
+        #log.info(f"Corrected bias gradient with {torch.numel(rec_labels)} known labels: {corrected_bias_grad}")
 
         # if corrected bias gradient has negative labels - we take them all
         # TODO: take most negative first, in case we got too many labels here
