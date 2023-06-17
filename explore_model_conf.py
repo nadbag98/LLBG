@@ -64,15 +64,5 @@ def main_launcher(cfg):
         pickle.dump(std_confs, f)
 
 
-    # for i in range(10):
-    #     data_ind = torch.randint(0, len(dataset), (1,))
-    #     # print(f"data index: {data_ind}")
-    #     im, lab = dataset[data_ind]
-    #     output = model(im.unsqueeze(0)).detach()
-    #     # normalize to distribution using softmax
-    #     output = output.softmax(dim=1)
-    #     print(f"Confidence in true label {lab}: {output[0][lab].item()}")
-
-
 if __name__ == "__main__":
     main_launcher()
