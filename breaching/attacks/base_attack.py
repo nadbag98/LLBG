@@ -29,11 +29,17 @@ class _BaseAttacker:
         self.setup = dict(device=setup["device"], dtype=getattr(torch, cfg_attack.impl.dtype))
         self.model_template = copy.deepcopy(model)
         self.loss_fn = copy.deepcopy(loss_fn)
-        # read the dictionary in the file "vgg19_imagenet_avg_confs.pkl" into self.conf_stats
-        #print("current working directory: ", os.getcwd())
+        
+        use_aux_stats = False
+        self.conf_stats = {i: 0 for i in range(1000)}
         # TODO: generalize to configurable folder
-        with open(f"/home/sharifm/students/nadavgat/breaching/vgg19_imagenet_avg_confs.pkl", "rb") as f:
-            self.conf_stats = pickle.load(f) 
+        if use_aux_stats:
+            conf_folder = "/home/sharifm/students/nadavgat/breaching/"
+            model_name = model.name.lower()
+            ds_name = "ImageNet"
+            conf_filename = f"{model_name}{model_name}_{ds_name.lower()}_avg_confs.pkl"
+            with open(conf_filename, "rb") as f:
+                self.conf_stats = pickle.load(f) 
 
     def reconstruct(self, server_payload, shared_data, server_secrets=None, dryrun=False):
         """Overwrite this function to implement a new attack."""
