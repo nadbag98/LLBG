@@ -1,4 +1,5 @@
 import torchvision
+from torchvision.models import resnet50
 import torch
 from breaching.cases import construct_dataloader
 import hydra
@@ -11,9 +12,12 @@ device = torch.device(f"cuda:0")
 
 @hydra.main(config_path="breaching/config", config_name="my_cfg", version_base="1.1")
 def main_launcher(cfg):
-    # print(cfg)
     _default_t = torchvision.transforms.ToTensor()
-    model = getattr(torchvision.models, "vgg19")(pretrained=True)
+    model_name = "densenet121"
+    ds_name = "imagenet"
+    
+    model = getattr(torchvision.models, model_name)(pretrained=True)
+    
     model.to(device)
     dataset = torchvision.datasets.ImageNet(
             root=cfg.case.data.path, split="val" , transform=_default_t,
@@ -57,10 +61,10 @@ def main_launcher(cfg):
         print(f"{ind}: {ind_avg_conf.item()} +- {ind_std_conf.item()}")
     
     # save avg_confs to a file named "vgg19_imagenet_avg_confs.pkl"
-    with open("vgg19_imagenet_avg_confs.pkl", "wb") as f:
+    with open(f"{model_name}_{ds_name}_avg_confs.pkl", "wb") as f:
         pickle.dump(avg_confs, f)
        
-    with open("vgg19_imagenet_std_confs.pkl", "wb") as f:
+    with open(f"{model_name}_{ds_name}_std_confs.pkl", "wb") as f:
         pickle.dump(std_confs, f)
 
 
