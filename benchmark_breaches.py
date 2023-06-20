@@ -15,6 +15,7 @@ import breaching
 
 import os
 from collections import OrderedDict
+from breaching.cases.models.model_preparation import VisionContainer
 
 os.environ["HYDRA_FULL_ERROR"] = "0"
 log = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ def main_process(process_idx, local_group_size, cfg, num_trials=100):
     setup = breaching.utils.system_startup(process_idx, local_group_size, cfg)
     model, loss_fn = breaching.cases.construct_model(cfg.case.model, cfg.case.data, cfg.case.server.pretrained)
 
-    def get_act_mlp(act = torch.nn.ReLU):
+    def get_act_mlp():
         width = 1024
         classes = cfg.case.data.classes
         model = torch.nn.Sequential(
@@ -38,14 +39,14 @@ def main_process(process_idx, local_group_size, cfg, num_trials=100):
                     ("linear1", torch.nn.Linear(width, width)),
                     ("relu1", torch.nn.ReLU()),
                     ("linear2", torch.nn.Linear(width, width)),
-                    ("act2", act()),
+                    ("act2", torch.nn.LeakyReLU()),
                     ("linear3", torch.nn.Linear(width, classes)),
                 ]
             )
         )
         return model
-
     
+    model = VisionContainer(get_act_mlp())
 
     if cfg.num_trials is not None:
         num_trials = cfg.num_trials
