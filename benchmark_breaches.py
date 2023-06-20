@@ -3,7 +3,7 @@
 
 The arguments from the default config carry over here.
 """
-
+import torch
 import hydra
 from omegaconf import OmegaConf
 
@@ -14,6 +14,7 @@ import logging
 import breaching
 
 import os
+from collections import OrderedDict
 
 os.environ["HYDRA_FULL_ERROR"] = "0"
 log = logging.getLogger(__name__)
@@ -24,6 +25,27 @@ def main_process(process_idx, local_group_size, cfg, num_trials=100):
     total_time = time.time()  # Rough time measurements here
     setup = breaching.utils.system_startup(process_idx, local_group_size, cfg)
     model, loss_fn = breaching.cases.construct_model(cfg.case.model, cfg.case.data, cfg.case.server.pretrained)
+
+    def get_act_mlp(act = torch.nn.ReLU):
+        width = 1024
+        classes = cfg.case.data.classes
+        model = torch.nn.Sequential(
+            OrderedDict(
+                [
+                    ("flatten", torch.nn.Flatten()),
+                    ("linear0", torch.nn.Linear(3072, width)),
+                    ("relu0", torch.nn.ReLU()),
+                    ("linear1", torch.nn.Linear(width, width)),
+                    ("relu1", torch.nn.ReLU()),
+                    ("linear2", torch.nn.Linear(width, width)),
+                    ("act2", act()),
+                    ("linear3", torch.nn.Linear(width, classes)),
+                ]
+            )
+        )
+        return model
+
+    
 
     if cfg.num_trials is not None:
         num_trials = cfg.num_trials
