@@ -30,14 +30,16 @@ class _BaseAttacker:
         self.model_template = copy.deepcopy(model)
         self.loss_fn = copy.deepcopy(loss_fn)
         
-        use_aux_stats = False
+        use_aux_data = False
+        v_hat = 0.9
         self.conf_stats = {i: 0 for i in range(1000)}
+        #self.conf_stats = {i: v_hat for i in range(1000)}
         # TODO: generalize to configurable folder
-        if use_aux_stats:
+        if use_aux_data:
             conf_folder = "/home/sharifm/students/nadavgat/breaching/"
-            model_name = model.name.lower()
-            ds_name = "ImageNet"
-            conf_filename = f"{model_name}{model_name}_{ds_name.lower()}_avg_confs.pkl"
+            model_name = "efficientnet_b0"
+            ds_name = "imagenet"
+            conf_filename = f"{conf_folder}{model_name}_{ds_name}_avg_confs.pkl"
             with open(conf_filename, "rb") as f:
                 self.conf_stats = pickle.load(f) 
 
