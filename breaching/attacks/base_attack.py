@@ -80,9 +80,6 @@ class _BaseAttacker:
         # Consider label information
         if shared_data[0]["metadata"]["labels"] is None:
             labels = self._recover_label_information(shared_data, server_payload, rec_models)
-            from breaching.analysis.analysis import count_integer_overlap
-            asr = count_integer_overlap(labels, shared_data[0]["metadata"]["labels"])
-            print(f"ASR: {asr}")
         else:
             labels = shared_data[0]["metadata"]["labels"].clone()
 
