@@ -80,6 +80,9 @@ class _BaseAttacker:
         # Consider label information
         if shared_data[0]["metadata"]["labels"] is None:
             labels = self._recover_label_information(shared_data, server_payload, rec_models)
+            from breaching.analysis.analysis import count_integer_overlap
+            asr = count_integer_overlap(labels, shared_data[0]["metadata"]["labels"])
+            print(f"ASR: {asr}")
         else:
             labels = shared_data[0]["metadata"]["labels"].clone()
 
@@ -408,16 +411,22 @@ class _BaseAttacker:
             g_per_query = [shared_data["gradients"][-2].sum(dim=1) for shared_data in user_data]
             g_i = torch.stack(g_per_query).mean(dim=0)
             # Stage 1:
-            for idx in range(num_classes):
-                if g_i[idx] < 0:
-                    label_list.append(torch.as_tensor(idx, device=self.setup["device"]))
-                    g_i[idx] -= m_impact
+            # modified to work when activation is not non-negative and there are more negative indices than batch size
+            negative_indices = torch.nonzero(g_i < 0).squeeze()
+            sorted_indices = torch.argsort(g_i[negative_indices])
+            label_list += negative_indices[sorted_indices[:min(num_data_points, len(negative_indices))]].tolist()
+
+            # for idx in range(num_classes):
+            #     if g_i[idx] < 0:
+            #         label_list.append(torch.as_tensor(idx, device=self.setup["device"]))
+            #         g_i[idx] -= m_impact
             # Stage 2:
             g_i = g_i - s_offset
             while len(label_list) < num_data_points:
                 selected_idx = g_i.argmin()
                 label_list.append(torch.as_tensor(selected_idx, device=self.setup["device"]))
-                g_i[idx] -= m_impact
+                # this was "idx" instead of "selected_idx" before!!!!
+                g_i[selected_idx] -= m_impact
             # Finalize labels:
             labels = torch.stack(label_list)
 
@@ -428,7 +437,9 @@ class _BaseAttacker:
             # Stage 1
             average_bias = torch.stack(bias_per_query).mean(dim=0)
             valid_classes = (average_bias < 0).nonzero()
-            label_list += [*valid_classes.squeeze(dim=-1)]
+            sorted_indices = torch.argsort(g_i[valid_classes.squeeze()])
+            label_list += valid_classes[sorted_indices[:min(num_data_points, len(valid_classes))]].tolist()
+            # label_list += [*valid_classes.squeeze(dim=-1)]
             m_impact = average_bias_correct_label = average_bias[valid_classes].sum() / num_data_points
 
             average_bias[valid_classes] = average_bias[valid_classes] - m_impact
