@@ -411,7 +411,9 @@ class _BaseAttacker:
             # modified to work when activation is not non-negative and there are more negative indices than batch size
             negative_indices = torch.nonzero(g_i < 0).squeeze()
             sorted_indices = torch.argsort(g_i[negative_indices])
-            label_list += negative_indices[sorted_indices[:min(num_data_points, len(negative_indices))]].tolist()
+            certain_labels = negative_indices[sorted_indices[:min(num_data_points, len(negative_indices))]].tolist()
+            for lab in certain_labels:
+                label_list.append(torch.as_tensor(lab, device=self.setup["device"]))
 
             # for idx in range(num_classes):
             #     if g_i[idx] < 0:
