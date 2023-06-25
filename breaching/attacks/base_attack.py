@@ -437,7 +437,8 @@ class _BaseAttacker:
             average_bias = torch.stack(bias_per_query).mean(dim=0)
             valid_classes = (average_bias < 0).nonzero()
             sorted_indices = torch.argsort(average_bias[valid_classes.squeeze()])
-            label_list += valid_classes[sorted_indices[:min(num_data_points, len(valid_classes))]].tolist()
+            for i in range(min(num_data_points, len(valid_classes))):
+                label_list.append(valid_classes[sorted_indices[i]])
             # label_list += [*valid_classes.squeeze(dim=-1)]
             m_impact = average_bias_correct_label = average_bias[valid_classes].sum() / num_data_points
 
