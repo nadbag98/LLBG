@@ -2,8 +2,9 @@
 # Configuration defaults
 # Settings are separated into case, attack analysis
 defaults:
-  - case: 6.2_large_batch_cifar_win
-  - attack: iterativedlbg
+  - case: 6_large_batch_cifar
+  #- case: 7_large_batch_imagenet
+  - attack: invertinggradients
   - _self_
   - override hydra/job_logging: custom
 
