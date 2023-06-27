@@ -393,8 +393,10 @@ class UserMultiStep(UserSingleStep):
         # ]
 
         # bugfix - to get the gradient (times lr) we need to subtract the local state from the server state
+        shared_lr = self.local_learning_rate if self.provide_local_hyperparams else 1.0
+        
         shared_grads = [
-            (p_server.to(**self.setup) - p_local).clone().detach()
+            (p_server.to(**self.setup) - p_local).clone().detach() / shared_lr
             for (p_local, p_server) in zip(self.model.parameters(), parameters)
         ]
 
