@@ -394,7 +394,7 @@ class UserMultiStep(UserSingleStep):
 
         # bugfix - to get the gradient (times lr) we need to subtract the local state from the server state
         shared_grads = [
-            (p_server.to(**self.setup)).clone().detach() - p_local
+            (p_server.to(**self.setup) - p_local).clone().detach()
             for (p_local, p_server) in zip(self.model.parameters(), parameters)
         ]
 
