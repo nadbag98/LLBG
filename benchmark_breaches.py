@@ -84,7 +84,7 @@ def main_process(process_idx, local_group_size, cfg, num_trials=100):
             run += 1
             # Run exchange
             shared_user_data, payloads, true_user_data = server.run_protocol(user)
-            log.info(f"True labels: {true_user_data['labels'].cpu().tolist()}")
+            log.info(f"True labels: {sorted(true_user_data['labels'].cpu().tolist())}")
             # Evaluate attack:
             try:
                 reconstruction, stats = attacker.reconstruct(

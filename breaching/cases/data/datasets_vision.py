@@ -122,9 +122,12 @@ def _split_dataset_vision(dataset, cfg_data, user_idx=None, return_full_dataset=
             data_ids += cls_b_inds[: bs // 4]
 
             # rest of batch is random
-            random_inds = torch.randint(0, len(dataset), (bs - len(data_ids),))
-            # random_inds = random.choices(list(dataset.lookup.keys()), k=bs - len(data_ids))
+            # random_inds = torch.randint(0, len(dataset), (bs - len(data_ids),))
+            random_inds = random.choices(list(dataset.lookup.keys()), k=bs - len(data_ids))
             data_ids += random_inds
+
+            # shuffle to avoid single-label batches in fedavg
+            random.shuffle(data_ids)
             
             dataset = Subset(dataset, data_ids)
             
