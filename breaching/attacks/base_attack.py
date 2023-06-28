@@ -31,7 +31,7 @@ class _BaseAttacker:
         self.loss_fn = copy.deepcopy(loss_fn)
         
         use_aux_data = False
-        v_hat = 0.9
+        v_hat = 0
         self.conf_stats = {i: 0 for i in range(1000)}
         #self.conf_stats = {i: v_hat for i in range(1000)}
         # TODO: generalize to configurable folder
@@ -409,8 +409,8 @@ class _BaseAttacker:
             g_i = torch.stack(g_per_query).mean(dim=0)
             # Stage 1:
             # modified to work when activation is not non-negative and there are more negative indices than batch size
-            negative_indices = torch.nonzero(g_i < 0).squeeze()
-            sorted_indices = torch.argsort(g_i[negative_indices])
+            negative_indices = torch.nonzero(g_i.squeeze() < 0).squeeze()
+            sorted_indices = torch.argsort(g_i[negative_indices].squeeze())
             certain_labels = negative_indices[sorted_indices[:min(num_data_points, len(negative_indices))]].tolist()
             for lab in certain_labels:
                 label_list.append(torch.as_tensor(lab, device=self.setup["device"]))
