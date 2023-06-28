@@ -12,7 +12,7 @@ local_diff_privacy:
   input_noise: 0.0
   distribution: laplacian
   per_example_clipping: 0.0
-  compression_value: 0.0
+  compression_percent: 0.0
 # Specific to this user type:
 
 # This user can also be used to simulate a larger silo over which the gradient is aggregated.

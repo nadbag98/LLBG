@@ -103,7 +103,7 @@ class UserSingleStep(torch.nn.Module):
         self.clip_value = local_diff_privacy.get("per_example_clipping", 0.0)
         if self.clip_value > 0:
             self.defense_repr.append(f"Defense: Gradient clipping to maximum of {self.clip_value}.")
-        self.compression_value = local_diff_privacy.get("compression_value", 0.0)
+        self.compression_percent = local_diff_privacy.get("compression_percent", 0.0)
 
     def compute_local_updates(self, server_payload, custom_data=None):
         """Compute local updates to the given model based on server payload.
@@ -201,9 +201,11 @@ class UserSingleStep(torch.nn.Module):
 
     def _apply_grad_compression(self, grads):
         """Apply gradient compression."""
-        if self.compression_value > 0:
+        if self.compression_percent > 0:
             for grad in grads:
-                mask = torch.abs(grad) < self.compression_value
+                # calculate the p'th precentile, where p is the compression_percent
+                comp_threshold = torch.kthvalue(torch.abs(grad).flatten(), int(grad.numel() * self.compression_percent)).values
+                mask = torch.abs(grad) <= comp_threshold
                 grad[mask] = 0
 
     def _load_data(self, setup=None):
