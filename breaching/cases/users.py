@@ -103,6 +103,7 @@ class UserSingleStep(torch.nn.Module):
         self.clip_value = local_diff_privacy.get("per_example_clipping", 0.0)
         if self.clip_value > 0:
             self.defense_repr.append(f"Defense: Gradient clipping to maximum of {self.clip_value}.")
+        self.compression_value = local_diff_privacy.get("compression_value", 0.0)
 
     def compute_local_updates(self, server_payload, custom_data=None):
         """Compute local updates to the given model based on server payload.
@@ -167,6 +168,7 @@ class UserSingleStep(torch.nn.Module):
             # Compute the forward pass
             shared_grads = _compute_batch_gradient(data)
         self._apply_differential_noise(shared_grads)
+        self._apply_grad_compression(shared_grads)
 
         if buffers is not None:
             shared_buffers = None
@@ -196,6 +198,13 @@ class UserSingleStep(torch.nn.Module):
         if self.generator is not None:
             for grad in grads:
                 grad += self.generator.sample(grad.shape)
+
+    def _apply_grad_compression(self, grads):
+        """Apply gradient compression."""
+        if self.compression_value > 0:
+            for grad in grads:
+                mask = torch.abs(grad) < self.compression_value
+                grad[mask] = 0
 
     def _load_data(self, setup=None):
         """Generate data from dataloader, truncated by self.num_data_points"""
