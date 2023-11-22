@@ -482,7 +482,9 @@ class _BaseAttacker:
             valid_classes = (average_bias < 0).nonzero()
             label_list += [*valid_classes.squeeze(dim=-1)]
             # here is the difference from bias-corrected: impact is independant of gradient
-            m_impact = - 1 / num_data_points
+            # this takes care to calculate impact correctly for fedavg
+            data_per_batch = user_data[0]["metadata"]["num_data_per_local_update_step"]
+            m_impact = - 1 / data_per_batch
 
             for cls in valid_classes:
                 model_conf = self.conf_stats[cls.item()]
