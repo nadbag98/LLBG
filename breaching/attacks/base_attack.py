@@ -483,7 +483,7 @@ class _BaseAttacker:
             label_list += [*valid_classes.squeeze(dim=-1)]
             # here is the difference from bias-corrected: impact is independant of gradient
             # this takes care to calculate impact correctly for fedavg
-            data_per_batch = user_data[0]["metadata"]["num_data_per_local_update_step"]
+            data_per_batch = user_data[0]["metadata"]["local_hyperparams"]["data_per_step"]
             m_impact = - 1 / data_per_batch
 
             for cls in valid_classes:
