@@ -24,8 +24,9 @@ log = logging.getLogger(__name__)
 class OptimizationBasedAttacker(_BaseAttacker):
     """Implements a wide spectrum of optimization-based attacks."""
 
-    def __init__(self, model, loss_fn, cfg_attack, setup=dict(dtype=torch.float, device=torch.device("cpu"))):
-        super().__init__(model, loss_fn, cfg_attack, setup)
+    def __init__(self, model, loss_fn, cfg_attack, setup=dict(dtype=torch.float, device=torch.device("cpu")), model_name=None, ds_name=None):
+        # TODO: clean up passing last to arguments
+        super().__init__(model, loss_fn, cfg_attack, setup, model_name, ds_name)
         objective_fn = objective_lookup.get(self.cfg.objective.type)
         if objective_fn is None:
             raise ValueError(f"Unknown objective type {self.cfg.objective.type} given.")

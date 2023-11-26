@@ -10,9 +10,9 @@ from .recursive_attack import RecursiveAttacker
 from .iterative_optimization_attack import IterativeOptimizationAttacker
 
 
-def prepare_attack(model, loss, cfg_attack, setup=dict(dtype=torch.float, device=torch.device("cpu"))):
+def prepare_attack(model, loss, cfg_attack, setup=dict(dtype=torch.float, device=torch.device("cpu")), model_name=None, ds_name=None):
     if cfg_attack.attack_type == "optimization":
-        attacker = OptimizationBasedAttacker(model, loss, cfg_attack, setup)
+        attacker = OptimizationBasedAttacker(model, loss, cfg_attack, setup, model_name, ds_name)
     elif cfg_attack.attack_type == "multiscale":
         attacker = MultiScaleOptimizationAttacker(model, loss, cfg_attack, setup)
     elif cfg_attack.attack_type == "analytic":

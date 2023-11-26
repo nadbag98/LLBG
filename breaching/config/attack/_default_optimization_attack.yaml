@@ -2,6 +2,9 @@ type: default
 
 attack_type: optimization # analytic, equation solver
 label_strategy: bias-corrected # Only in effect if the user does not provide labels
+use_aux_data: False
+approx_avg_conf: 0.0
+conf_folder: conf/
 # Label strategy options are 'iDLG', 'analytic', 'yin', 'wainakh-simple', 'wainakh-whitebox', 'random', 'exhaustive'
 text_strategy: run-embedding # options: run-embedding
 token_recovery: from-labels

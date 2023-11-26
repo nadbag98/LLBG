@@ -23,22 +23,22 @@ class _BaseAttacker:
     A basic assumption for this attacker is that user data is fixed over multiple queries.
     """
 
-    def __init__(self, model, loss_fn, cfg_attack, setup=dict(dtype=torch.float, device=torch.device("cpu"))):
+    def __init__(self, model, loss_fn, cfg_attack, setup=dict(dtype=torch.float, device=torch.device("cpu")), model_name=None, ds_name=None):
         self.cfg = cfg_attack
         self.memory_format = torch.channels_last if cfg_attack.impl.mixed_precision else torch.contiguous_format
         self.setup = dict(device=setup["device"], dtype=getattr(torch, cfg_attack.impl.dtype))
         self.model_template = copy.deepcopy(model)
         self.loss_fn = copy.deepcopy(loss_fn)
         
-        use_aux_data = False
-        v_hat = 0
-        self.conf_stats = {i: 0 for i in range(1000)}
-        #self.conf_stats = {i: v_hat for i in range(1000)}
-        # TODO: generalize to configurable folder
+        # TODO: make sure this code works when the attack is not optimization
+        use_aux_data = cfg_attack.use_aux_data
+        v_hat = cfg_attack.approx_avg_conf
+        # self.conf_stats = {i: 0 for i in range(1000)}
+        self.conf_stats = {i: v_hat for i in range(1000)}
         if use_aux_data:
-            conf_folder = "/home/sharifm/students/nadavgat/breaching/"
-            model_name = "efficientnet_b0"
-            ds_name = "imagenet"
+            conf_folder = cfg_attack.conf_folder
+            model_name = model_name.lower()
+            ds_name = ds_name.lower()
             conf_filename = f"{conf_folder}{model_name}_{ds_name}_avg_confs.pkl"
             with open(conf_filename, "rb") as f:
                 self.conf_stats = pickle.load(f) 

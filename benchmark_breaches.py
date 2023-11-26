@@ -53,7 +53,8 @@ def main_process(process_idx, local_group_size, cfg, num_trials=100):
 
     server = breaching.cases.construct_server(model, loss_fn, cfg.case, setup)
     model = server.vet_model(model)
-    attacker = breaching.attacks.prepare_attack(model, loss_fn, cfg.attack, setup)
+    # TODO: clean up passing last to args
+    attacker = breaching.attacks.prepare_attack(model, loss_fn, cfg.attack, setup, cfg.case.data.name)
     if cfg.case.user.user_idx is not None:
         print("The argument user_idx is disregarded during the benchmark. Data selection is fixed.")
     log.info(
