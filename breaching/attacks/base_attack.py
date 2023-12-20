@@ -490,6 +490,11 @@ class _BaseAttacker:
                 model_conf = self.conf_stats[cls.item()]
                 average_bias[cls] -= m_impact * (1 - model_conf)
             # average_bias[valid_classes] = average_bias[valid_classes] - m_impact
+
+            # if the model is untrained, we have a positive offset of number of local steps divided by number of classes
+            num_steps = user_data[0]["metadata"]["local_hyperparams"]["num_local_updates"]
+            average_bias -= num_steps / num_classes
+            
             # Stage 2
             while len(label_list) < num_data_points:
                 selected_idx = average_bias.argmin()
