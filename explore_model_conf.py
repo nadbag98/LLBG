@@ -14,28 +14,22 @@ device = torch.device(f"cuda:0")
 
 @hydra.main(config_path="breaching/config", config_name="my_cfg", version_base="1.1")
 def main_launcher(cfg):
-    _default_t = torchvision.transforms.ToTensor()
-    cfg.case.data.partition = "balanced"
-    cfg.case.data.batch_size = 100
-    cfg.case.user.num_data_points = 100
-    cfg.case.model = "resnet50"
-    ds_name = "imagenet"
+    # _default_t = torchvision.transforms.ToTensor()
+    # cfg.case.data.partition = "balanced"
+    # cfg.case.data.batch_size = 100
+    # cfg.case.user.num_data_points = 100
+    # cfg.case.model = "resnet50"
+    # ds_name = "imagenet"
     
     model = getattr(torchvision.models, cfg.case.model)(pretrained=cfg.case.server.pretrained)
     model.eval()
     model.to(device)
 
-    # avg_confs = {}
-    # std_confs = {}
-
     entropys_sum = 0.0
 
-    for ind in range(100):
-        dataloader = construct_dataloader(cfg.case.data, cfg.case.impl, user_idx=ind, return_full_dataset=False)
-        for _, data_block in enumerate(dataloader):
-            inputs, labels = data_block["inputs"], data_block["labels"]
-            break
-
+    dataloader = construct_dataloader(cfg.case.data, cfg.case.impl, user_idx=0, return_full_dataset=False)
+    for _, data_block in enumerate(dataloader):
+        inputs, labels = data_block["inputs"], data_block["labels"]
         inputs = inputs.to(device)
         outputs = model(inputs)
         outputs = outputs.softmax(dim=1)
