@@ -8,6 +8,7 @@ from omegaconf import OmegaConf
 from breaching.cases.data.datasets_vision import _build_dataset_vision
 from breaching.cases.data.data_preparation import construct_dataloader
 import pickle
+from breaching.cases.models.model_preparation import _construct_vision_model
 
 device = torch.device(f"cuda:0")
 #device = torch.device("cpu")
@@ -21,7 +22,8 @@ def main_launcher(cfg):
     # cfg.case.model = "resnet50"
     # ds_name = "imagenet"
     
-    model = getattr(torchvision.models, cfg.case.model)(pretrained=cfg.case.server.pretrained)
+    # model = getattr(torchvision.models, cfg.case.model)(pretrained=cfg.case.server.pretrained)
+    model = _construct_vision_model(cfg.case.model, cfg.case.data, cfg.case.server.pretrained)
     model.eval()
     model.to(device)
 
