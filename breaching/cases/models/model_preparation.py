@@ -397,7 +397,19 @@ def _construct_vision_model(cfg_model, cfg_data, pretrained=True, **kwargs):
                     ]
                 )
             )
-        elif cfg_model == "MLP":
+        elif "MLP" in cfg_model:
+            act = None
+            if cfg_model == "MLP":
+                act = torch.nn.ReLU()
+            if cfg_model == "MLP_relu":
+                act = torch.nn.ReLU()
+            elif cfg_model == "MLP_sigmoid":
+                act = torch.nn.Sigmoid()
+            elif cfg_model == "MLP_leaky":
+                act = torch.nn.LeakyReLU()
+            if cfg_model == "MLP_tanh":
+                act = torch.nn.Tanh()
+            
             width = 1024
             model = torch.nn.Sequential(
                 OrderedDict(
@@ -408,7 +420,7 @@ def _construct_vision_model(cfg_model, cfg_data, pretrained=True, **kwargs):
                         ("linear1", torch.nn.Linear(width, width)),
                         ("relu1", torch.nn.ReLU()),
                         ("linear2", torch.nn.Linear(width, width)),
-                        ("relu2", torch.nn.ReLU()),
+                        ("act2", act),
                         ("linear3", torch.nn.Linear(width, classes)),
                     ]
                 )
