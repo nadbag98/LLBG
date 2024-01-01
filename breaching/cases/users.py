@@ -392,6 +392,7 @@ class UserMultiStep(UserSingleStep):
             if self.clip_value > 0:
                 self._clip_list_of_grad_(grads_ref)
             self._apply_differential_noise(grads_ref)
+            self._apply_grad_compression(grads_ref)
             optimizer.step()
 
         # Share differential to server version:
