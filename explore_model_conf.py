@@ -29,14 +29,15 @@ def main_launcher(cfg):
 
     entropys_sum = 0.0
 
-    dataloader = construct_dataloader(cfg.case.data, cfg.case.impl, user_idx=0, return_full_dataset=False)
-    for _, data_block in enumerate(dataloader):
-        inputs, labels = data_block["inputs"], data_block["labels"]
-        inputs = inputs.to(device)
-        outputs = model(inputs)
-        outputs = outputs.softmax(dim=1)
-        entropy_per_sample = -torch.sum(outputs * torch.log2(outputs), dim=1)
-        entropys_sum += torch.mean(entropy_per_sample)
+    for user in range(100):
+        dataloader = construct_dataloader(cfg.case.data, cfg.case.impl, user_idx=user, return_full_dataset=False)
+        for _, data_block in enumerate(dataloader):
+            inputs, labels = data_block["inputs"], data_block["labels"]
+            inputs = inputs.to(device)
+            outputs = model(inputs)
+            outputs = outputs.softmax(dim=1)
+            entropy_per_sample = -torch.sum(outputs * torch.log2(outputs), dim=1)
+            entropys_sum += torch.mean(entropy_per_sample)
 
     print(f"average entropy: {entropys_sum / 100}")
 
