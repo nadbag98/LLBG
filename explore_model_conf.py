@@ -38,6 +38,7 @@ def main_launcher(cfg):
             outputs = outputs.softmax(dim=1)
             entropy_per_sample = -torch.sum(outputs * torch.log2(outputs), dim=1)
             entropys_sum += torch.mean(entropy_per_sample)
+            break
 
     print(f"average entropy: {entropys_sum / 100}")
 
