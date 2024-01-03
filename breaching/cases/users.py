@@ -392,7 +392,6 @@ class UserMultiStep(UserSingleStep):
             if self.clip_value > 0:
                 self._clip_list_of_grad_(grads_ref)
             self._apply_differential_noise(grads_ref)
-            self._apply_grad_compression(grads_ref)
             optimizer.step()
 
         # Share differential to server version:
@@ -411,6 +410,8 @@ class UserMultiStep(UserSingleStep):
             (p_server.to(**self.setup) - p_local).clone().detach() / shared_lr
             for (p_local, p_server) in zip(self.model.parameters(), parameters)
         ]
+
+        self._apply_grad_compression(shared_grads)
 
         shared_buffers = [b.clone().detach() for b in self.model.buffers()]
         metadata = dict(
