@@ -436,7 +436,7 @@ class _BaseAttacker:
             # Stage 1
             average_bias = torch.stack(bias_per_query).mean(dim=0)
             valid_classes = (average_bias < 0).nonzero()
-            sorted_indices = torch.argsort(average_bias[valid_classes.squeeze()])
+            sorted_indices = torch.argsort(average_bias[valid_classes.squeeze()]).unsqueeze(0)
             for i in range(min(num_data_points, len(valid_classes))):
                 label_list.append(valid_classes[sorted_indices[i]].squeeze())
             # label_list += [*valid_classes.squeeze(dim=-1)]
