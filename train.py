@@ -54,7 +54,7 @@ def train(model, train_loader, optimizer, criterion, device, num_epochs=100):
             output = model(data)
             
             pred = output.argmax(dim=1)
-            correct += pred.eq(target).sum().item()
+            correct += pred.eq(target.squeeze()).sum().item()
     train_acc = correct / len(train_loader.dataset)
     
     return train_losses, train_acc
