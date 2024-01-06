@@ -55,13 +55,14 @@ class VGG(nn.Module):
         head="CIFAR",
         drop_rate=0.0,
         classical_weight_init=False,
+        use_bias=True,
     ):
         super().__init__()
         self._conv_layer, self._norm_layer, self._nonlin_layer = get_layer_functions(convolution_type, norm, nonlin)
         self.features = self._make_layers(cfg[vgg_name], in_channels)
 
         if head == "CIFAR":
-            self.classifier = nn.Linear(512, num_classes)
+            self.classifier = nn.Linear(512, num_classes, bias=use_bias)
         elif head == "TinyImageNet":
             self.classifier = torch.nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)), nn.Linear(512, num_classes))
         else:
