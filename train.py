@@ -107,13 +107,13 @@ def main():
             batch_size=64,
             shuffle=True
         )
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.000001, weight_decay=0.0005)
 
         train_losses, train_acc = train(model, train_loader, optimizer, criterion, device, num_epochs=1)
         print(f"train loss: {train_losses[-1]}, train acc: {train_acc}")
         # save model
         torch.save(model.state_dict(), 'vgg11_bias_tr.pth')
-        
+
     test_loader = torch.utils.data.DataLoader(
         dataset=torchvision.datasets.CIFAR100(
             root='./data', train=False, download=True, transform=torchvision.transforms.ToTensor()
