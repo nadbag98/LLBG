@@ -53,7 +53,7 @@ def train(model, train_loader, optimizer, criterion, device, num_epochs=100):
             
             output = model(data)
             
-            pred = output.argmax(dim=1, keepdim=True)
+            pred = output.argmax(dim=1)
             correct += pred.eq(target).sum().item()
     train_acc = correct / len(train_loader.dataset)
     
@@ -73,7 +73,7 @@ def test(model, test_loader, criterion, device):
             test_loss += criterion(output, target).item()
             # round each output to 0 or 1
             # pred = torch.round(output)
-            pred = output.argmax(dim=1, keepdim=True)
+            pred = output.argmax(dim=1)
             correct += pred.eq(target).sum().item()
             
     test_loss /= len(test_loader.dataset)
@@ -112,7 +112,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
     criterion = torch.nn.CrossEntropyLoss()
 
-    train_losses, train_acc = train(model, train_loader, optimizer, criterion, device, num_epochs=100)
+    train_losses, train_acc = train(model, train_loader, optimizer, criterion, device, num_epochs=1)
     print(f"train loss: {train_losses[-1]}, train acc: {train_acc}")
     # save model
     torch.save(model.state_dict(), 'vgg11_bias_tr.pth')
