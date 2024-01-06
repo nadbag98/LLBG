@@ -131,7 +131,7 @@ def main():
         )
         optimizer = torch.optim.Adam(model.parameters(), lr=0.000001, weight_decay=0.0005)
 
-        train_losses, train_acc = train(model, train_loader, optimizer, criterion, device, num_epochs=1)
+        train_losses, train_acc = train(model, train_loader, optimizer, criterion, device, num_epochs=100)
         print(f"train loss: {train_losses[-1]}, train acc: {train_acc}")
         # save model
         torch.save(model.state_dict(), path)
