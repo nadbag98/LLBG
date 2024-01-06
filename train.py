@@ -43,6 +43,7 @@ def train(model, train_loader, optimizer, criterion, device, num_epochs=100):
             curr_loss += loss.item()
         curr_loss /= len(train_loader.dataset)
         train_losses.append(curr_loss)
+        print(f"epoch: {epoch}, loss: {curr_loss}")
     # calculate final accuracy
     model.eval()
     correct = 0
