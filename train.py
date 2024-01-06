@@ -9,6 +9,7 @@ import time
 import logging
 
 import breaching
+from collections import OrderedDict
 
 import os
 from breaching.cases.models.model_preparation import _construct_vision_model
@@ -81,23 +82,44 @@ def test(model, test_loader, criterion, device):
     return test_loss, test_acc
 
 def main():
-    model = VGG(
-                    "VGG11",
-                    in_channels=3,
-                    num_classes=100,
-                    norm="BatchNorm2d",
-                    nonlin="ReLU",
-                    head="CIFAR",
-                    convolution_type="Standard",
-                    drop_rate=0,
-                    classical_weight_init=True,
-                    use_bias=True,
+    # model = VGG(
+    #                 "VGG11",
+    #                 in_channels=3,
+    #                 num_classes=100,
+    #                 norm="BatchNorm2d",
+    #                 nonlin="ReLU",
+    #                 head="CIFAR",
+    #                 convolution_type="Standard",
+    #                 drop_rate=0,
+    #                 classical_weight_init=True,
+    #                 use_bias=True,
+    #             )
+
+    model = torch.nn.Sequential(
+                OrderedDict(
+                    [
+                        ("conv1", torch.nn.Conv2d(3, 32, 3, stride=2, padding=1)),
+                        ("relu0", torch.nn.LeakyReLU()),
+                        ("conv2", torch.nn.Conv2d(32, 64, 3, stride=1, padding=1)),
+                        ("relu1", torch.nn.LeakyReLU()),
+                        ("conv3", torch.nn.Conv2d(64, 128, 3, stride=2, padding=1)),
+                        ("relu2", torch.nn.LeakyReLU()),
+                        ("conv4", torch.nn.Conv2d(128, 256, 3, stride=1, padding=1)),
+                        ("relu3", torch.nn.LeakyReLU()),
+                        ("flatt", torch.nn.Flatten()),
+                        ("linear0", torch.nn.Linear(12544, 12544)),
+                        ("relu4", torch.nn.LeakyReLU()),
+                        ("linear1", torch.nn.Linear(12544, 100, bias=True)),
+                    ]
                 )
+            )
+    path = "cnn_beyond_bias_tr.pth"
+
     # try loading weights from pretrained model
     model.to(device)
     criterion = torch.nn.CrossEntropyLoss()
     try:
-        model.load_state_dict(torch.load('vgg11_bias_tr.pth'))
+        model.load_state_dict(torch.load(path))
     except:
         # load cifar100 data into train_loader and test_loader, from torch
         train_loader = torch.utils.data.DataLoader(
@@ -112,7 +134,7 @@ def main():
         train_losses, train_acc = train(model, train_loader, optimizer, criterion, device, num_epochs=1)
         print(f"train loss: {train_losses[-1]}, train acc: {train_acc}")
         # save model
-        torch.save(model.state_dict(), 'vgg11_bias_tr.pth')
+        torch.save(model.state_dict(), path)
 
     test_loader = torch.utils.data.DataLoader(
         dataset=torchvision.datasets.CIFAR100(
