@@ -93,15 +93,27 @@ def main():
                     classical_weight_init=True,
                     use_bias=True,
                 )
+    # try loading weights from pretrained model
     model.to(device)
-    # load cifar100 data into train_loader and test_loader, from torch
-    train_loader = torch.utils.data.DataLoader(
-        dataset=torchvision.datasets.CIFAR100(
-            root='./data', train=True, download=True, transform=torchvision.transforms.ToTensor()
-        ),
-        batch_size=64,
-        shuffle=True
-    )
+    criterion = torch.nn.CrossEntropyLoss()
+    try:
+        model.load_state_dict(torch.load('vgg11_bias_tr.pth'))
+    except:
+        # load cifar100 data into train_loader and test_loader, from torch
+        train_loader = torch.utils.data.DataLoader(
+            dataset=torchvision.datasets.CIFAR100(
+                root='./data', train=True, download=True, transform=torchvision.transforms.ToTensor()
+            ),
+            batch_size=64,
+            shuffle=True
+        )
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
+
+        train_losses, train_acc = train(model, train_loader, optimizer, criterion, device, num_epochs=1)
+        print(f"train loss: {train_losses[-1]}, train acc: {train_acc}")
+        # save model
+        torch.save(model.state_dict(), 'vgg11_bias_tr.pth')
+        
     test_loader = torch.utils.data.DataLoader(
         dataset=torchvision.datasets.CIFAR100(
             root='./data', train=False, download=True, transform=torchvision.transforms.ToTensor()
@@ -109,13 +121,6 @@ def main():
         batch_size=64,
         shuffle=True
     )
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
-    criterion = torch.nn.CrossEntropyLoss()
-
-    train_losses, train_acc = train(model, train_loader, optimizer, criterion, device, num_epochs=1)
-    print(f"train loss: {train_losses[-1]}, train acc: {train_acc}")
-    # save model
-    torch.save(model.state_dict(), 'vgg11_bias_tr.pth')
     test_loss, test_acc = test(model, test_loader, criterion, device)
     print(f"test loss: {test_loss}, test acc: {test_acc}")
 
