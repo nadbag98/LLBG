@@ -10,6 +10,7 @@ import logging
 
 import breaching
 from collections import OrderedDict
+import argparse
 
 import os
 from breaching.cases.models.model_preparation import _construct_vision_model
@@ -83,6 +84,14 @@ def test(model, test_loader, criterion, device):
     return test_loss, test_acc
 
 def main():
+    # add argparser for num_epochs, learning rate, weight decay
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--num_epochs", type=int, default=100)
+    parser.add_argument("--lr", type=float, default=0.00001)
+    parser.add_argument("--weight_decay", type=float, default=0.0005)
+    args = parser.parse_args()
+
+
     # model = VGG(
     #                 "VGG11",
     #                 in_channels=3,
@@ -114,7 +123,7 @@ def main():
                     ]
                 )
             )
-    path = "cnn_beyond_bias_tr.pth"
+    path = f"cnn_beyond_bias_lr{args.lr}_wd{args.weight_decay}.pth"
 
     # try loading weights from pretrained model
     model.to(device)
@@ -130,10 +139,15 @@ def main():
             batch_size=64,
             shuffle=True
         )
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.000001, weight_decay=0.0005)
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
-        train_losses, train_acc = train(model, train_loader, optimizer, criterion, device, num_epochs=100)
+        train_losses, train_acc = train(model, train_loader, optimizer, criterion, device, num_epochs=args.num_epochs)
         print(f"train loss: {train_losses[-1]}, train acc: {train_acc}")
+        # plot train losses and save plot to file
+        import matplotlib.pyplot as plt
+        plt.plot(train_losses)
+        plt.savefig(f"train_losses_lr{args.lr}_wd{args.wd}.png")
+
         # save model
         torch.save(model.state_dict(), path)
 
