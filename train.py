@@ -146,7 +146,7 @@ def main():
         # plot train losses and save plot to file
         import matplotlib.pyplot as plt
         plt.plot(train_losses)
-        plt.savefig(f"train_losses_lr{args.lr}_wd{args.wd}.png")
+        plt.savefig(f"train_losses_lr{args.lr}_wd{args.weight_decay}.png")
 
         # save model
         torch.save(model.state_dict(), path)
