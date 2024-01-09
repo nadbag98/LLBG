@@ -413,7 +413,14 @@ class _BaseAttacker:
 
             # After determining impact and offset, run the actual recovery algorithm
             label_list = []
-            g_per_query = [shared_data["gradients"][-2].sum(dim=1) for shared_data in user_data]
+            # TODO: make more elegant
+            loc = 0
+            if shared_data["gradients"][-1].numel() == 100:
+                loc = -2
+            else:
+                # last gradient is weights
+                loc = -1
+            g_per_query = [shared_data["gradients"][loc].sum(dim=1) for shared_data in user_data]
             g_i = torch.stack(g_per_query).mean(dim=0)
             # Stage 1:
             # modified to work when activation is not non-negative and there are more negative indices than batch size
