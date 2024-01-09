@@ -311,6 +311,7 @@ def _construct_vision_model(cfg_model, cfg_data, pretrained=True, **kwargs):
                 convolution_type="Standard",
             )
         elif "vgg" in cfg_model.lower():
+            use_bias = "n" not in cfg_model.lower()
             model = VGG(
                 cfg_model,
                 in_channels=channels,
@@ -321,7 +322,12 @@ def _construct_vision_model(cfg_model, cfg_data, pretrained=True, **kwargs):
                 convolution_type="Standard",
                 drop_rate=0,
                 classical_weight_init=True,
+                use_bias=use_bias,
             )
+            if pretrained:
+                # load model weights from file
+                path = f"/home/sharifm/students/nadavgat/breaching/{cfg_model.lower()}.pth"
+                model.load_state_dict(torch.load(path))
         elif "linear" in cfg_model:
             input_dim = cfg_data.shape[0] * cfg_data.shape[1] * cfg_data.shape[2]
             model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(input_dim, classes))

@@ -327,7 +327,9 @@ class _BaseAttacker:
         The behavior with respect to multiple queries is work in progress and subject of debate.
         """
         num_data_points = user_data[0]["metadata"]["num_data_points"]
-        num_classes = user_data[0]["gradients"][-1].shape[0]
+        # TODO: change this back!
+        # num_classes = user_data[0]["gradients"][-1].shape[0]
+        num_classes = 100
         num_queries = len(user_data)
 
         if self.cfg.label_strategy is None:
@@ -365,7 +367,13 @@ class _BaseAttacker:
                 # As seen in Weinakh et al., "User Label Leakage from Gradients in Federated Learning"
                 m_impact = 0
                 for query_id, shared_data in enumerate(user_data):
-                    g_i = shared_data["gradients"][-2].sum(dim=1)
+                    # TODO: improve this
+                    # check whether there is bias gradient
+                    if shared_data["gradients"][-1].numel() == 100:
+                        g_i = shared_data["gradients"][-2].sum(dim=1)
+                    else:
+                        # last gradient is weights
+                        g_i = shared_data["gradients"][-1].sum(dim=1)
                     m_query = (
                         torch.where(g_i < 0, g_i, torch.zeros_like(g_i)).sum() * (1 + 1 / num_classes) / num_data_points
                     )
