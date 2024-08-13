@@ -4,6 +4,7 @@ tables/*/*.csv#
 tables/*.csv
 tables/*.csv#
 tables/*.ods
+data/
 
 .vs/
 

@@ -2,7 +2,7 @@
 # Configuration defaults
 # Settings are separated into case, attack analysis
 defaults:
-  - case: 2_single_imagenet
+  - case: 6_large_batch_cifar
   - attack: invertinggradients
   - _self_
   - override hydra/job_logging: custom
@@ -26,4 +26,4 @@ dryrun: False
 
 # When benchmarking:
 num_trials: 100
-save_reconstruction: False
+save_reconstruction: True

@@ -394,16 +394,6 @@ class UserMultiStep(UserSingleStep):
             self._apply_differential_noise(grads_ref)
             optimizer.step()
 
-        # Share differential to server version:
-        # This is equivalent to sending the new stuff and letting the server do it, but in line
-        # with the gradients sent in UserSingleStep
-        
-        # shared_grads = [
-        #     (p_local - p_server.to(**self.setup)).clone().detach()
-        #     for (p_local, p_server) in zip(self.model.parameters(), parameters)
-        # ]
-
-        # bugfix - to get the gradient (times lr) we need to subtract the local state from the server state
         shared_lr = self.local_learning_rate if self.provide_local_hyperparams else 1.0
         
         shared_grads = [

@@ -29,11 +29,11 @@ class _BaseAttacker:
         self.setup = dict(device=setup["device"], dtype=getattr(torch, cfg_attack.impl.dtype))
         self.model_template = copy.deepcopy(model)
         self.loss_fn = copy.deepcopy(loss_fn)
+        self.model_name = model_name.lower()
+        self.ds_name = ds_name.lower()
         
-        # TODO: make sure this code works when the attack is not optimization
         use_aux_data = cfg_attack.use_aux_data
         v_hat = cfg_attack.approx_avg_conf
-        # self.conf_stats = {i: 0 for i in range(1000)}
         self.conf_stats = {i: v_hat for i in range(1000)}
         if use_aux_data:
             conf_folder = cfg_attack.conf_folder
@@ -87,99 +87,6 @@ class _BaseAttacker:
         if self.cfg.normalize_gradients:
             shared_data = self._normalize_gradients(shared_data)
         return rec_models, labels, stats
-
-    def _prepare_for_text_data(self, shared_data, rec_models):
-        """Reconstruct the output of the Embedding Layer?"""
-        # _circumvent_embedding_layer
-        if "run-embedding" == self.cfg.text_strategy:
-            # 1) Basic trick: Optimize in embedding space
-            # Cut off embeddings:
-            self.embeddings = []
-            for model, data in zip(rec_models, shared_data):
-                name_to_idx = dict(zip([n for n, _ in model.named_parameters()], range(len(data["gradients"]))))
-
-                for name in embedding_layer_names:
-                    for key in name_to_idx.keys():
-                        if name in key:
-                            embedding_position = name_to_idx[key]  # todo: generalize this in a robuster way
-
-                self.embeddings.append(
-                    dict(
-                        weight=list(model.parameters())[embedding_position],
-                        grads=data["gradients"].pop(embedding_position),
-                    )
-                )
-                # Recur through model to find the matching module and disable it:
-
-                def replace(model):
-                    for child_name, child in model.named_children():
-                        if isinstance(child, torch.nn.Embedding):
-                            if child.weight is self.embeddings[-1]["weight"]:
-                                setattr(model, child_name, torch.nn.Identity())
-                        else:
-                            replace(child)
-
-                replace(model)
-
-            # Adjust data shape
-            _, token_embedding_dim = self.embeddings[0]["weight"].shape
-            self.data_shape = [*self.data_shape, token_embedding_dim]
-        elif self.cfg.text_strategy == "no-preprocessing":
-            pass
-        else:
-            raise ValueError(f"Invalid text strategy {self.cfg.text_strategy} given.")
-        # To try later:
-        # Assuming sequence_length is known, and all tokens are leaked from the Embedding Layer
-        # We should find the input by optimizing a "segmentation map" of these tokens
-        # This can be relaxed to [0,1] constraints and solved with convex programming tricks
-        # The Relaxation can be constructed over the Subset of tokens with non-zero gradients
-        # Basic model (as also seen in DLG): Optimize in embedding space
-        return rec_models, shared_data
-
-    def _postprocess_text_data(self, reconstructed_user_data, models=None):
-        """Post-process text data to recover tokens."""
-
-        def _max_similarity(recovered_embeddings, true_embeddings):
-            recovered_embeddings = recovered_embeddings - recovered_embeddings.mean(dim=-1, keepdim=True)
-            true_embeddings = true_embeddings - true_embeddings.mean(dim=-1, keepdim=True)
-            norm_rec = recovered_embeddings.pow(2).sum(dim=-1)
-            norm_true = true_embeddings.pow(2).sum(dim=-1)
-            cosim = recovered_embeddings.matmul(true_embeddings.T) / norm_rec[:, None] / norm_true[None, :]
-            return cosim.argmax(dim=1)
-
-        if hasattr(self, "embeddings"):
-            # Use extracted embeddings:
-            embedding_weight = self.embeddings[0]["weight"]
-        else:
-            # or lazily import lookup table
-            from ..cases.models.transformer_dictionary import lookup_module_names
-
-            embedding_weight = lookup_module_names(models[0].name, models[0])["embedding"].weight
-
-        if self.cfg.token_recovery == "from-embedding":
-            # This is the DLG strategy. Look up all inputs in embedding space.
-            recovered_embeddings = reconstructed_user_data["data"]
-            base_shape = recovered_embeddings.shape[0:2]
-            recovered_embeddings = recovered_embeddings.view(-1, recovered_embeddings.shape[-1])
-            true_embeddings = embedding_weight
-
-            recovered_tokens = _max_similarity(recovered_embeddings, true_embeddings).view(*base_shape)
-
-        elif self.cfg.token_recovery == "from-labels":
-            # Only works well in some causal-lm?
-            recovered_tokens = reconstructed_user_data["labels"]
-        elif self.cfg.token_recovery == "from-limited-embedding":
-            # Retrieve possible embeddings from gradient data
-            recovered_embeddings = reconstructed_user_data["data"]
-            base_shape = recovered_embeddings.shape[0:2]
-            recovered_embeddings = recovered_embeddings.view(-1, recovered_embeddings.shape[-1])
-            active_embedding_ids = reconstructed_user_data["labels"].unique()
-            true_embeddings = embedding_weight[active_embedding_ids, :]
-            matches = _max_similarity(recovered_embeddings, true_embeddings)
-            recovered_tokens = active_embedding_ids[matches].view(*base_shape)
-
-        reconstructed_user_data["data"] = recovered_tokens
-        return reconstructed_user_data
 
     def _construct_models_from_payload_and_buffers(self, server_payload, shared_data):
         """Construct the model (or multiple) that is sent by the server and include user buffers if any."""
@@ -327,53 +234,26 @@ class _BaseAttacker:
         The behavior with respect to multiple queries is work in progress and subject of debate.
         """
         num_data_points = user_data[0]["metadata"]["num_data_points"]
-        # TODO: change this back!
-        # num_classes = user_data[0]["gradients"][-1].shape[0]
-        num_classes = 100
+        if self.ds_name == "imagenet":
+            num_classes = 1000
+        else:
+            num_classes = 100
         num_queries = len(user_data)
 
         if self.cfg.label_strategy is None:
             return None
-        elif self.cfg.label_strategy == "iDLG":
-            # In the simplest case, the label can just be inferred from the last layer
-            # This was popularized in "iDLG" by Zhao et al., 2020
-            # assert num_data_points == 1
-            label_list = []
-            for query_id, shared_data in enumerate(user_data):
-                last_weight_min = torch.argmin(torch.sum(shared_data["gradients"][-2], dim=-1), dim=-1)
-                label_list += [last_weight_min.detach()]
-            labels = torch.stack(label_list).unique()
-        elif self.cfg.label_strategy == "analytic":
-            # Analytic recovery simply works as long as all labels are unique.
-            label_list = []
-            for query_id, shared_data in enumerate(user_data):
-                valid_classes = (shared_data["gradients"][-1] < 0).nonzero()
-                label_list += [valid_classes]
-            labels = torch.stack(label_list).unique()[:num_data_points]
-        elif self.cfg.label_strategy == "yin":
-            # As seen in Yin et al. 2021, "See Through Gradients: Image Batch Recovery via GradInversion"
-            # This additionally assumes that there is a nonlinearity with positive output (like ReLU) in front of the
-            # last classification layer.
-            # This scheme also works best if all labels are unique
-            # Otherwise this is an extension of iDLG to multiple labels:
-            total_min_vals = 0
-            for query_id, shared_data in enumerate(user_data):
-                total_min_vals += shared_data["gradients"][-2].min(dim=-1)[0]
-            labels = total_min_vals.argsort()[:num_data_points]
 
         elif "wainakh" in self.cfg.label_strategy:
-
+            # TODO: verify this!!
+            if shared_data["gradients"].shape[1] == 1:
+                weight_grad_loc = -2
+            else:
+                weight_grad_loc = -1
             if self.cfg.label_strategy == "wainakh-simple":
                 # As seen in Weinakh et al., "User Label Leakage from Gradients in Federated Learning"
                 m_impact = 0
                 for query_id, shared_data in enumerate(user_data):
-                    # TODO: improve this
-                    # check whether there is bias gradient
-                    if shared_data["gradients"][-1].numel() == 100:
-                        g_i = shared_data["gradients"][-2].sum(dim=1)
-                    else:
-                        # last gradient is weights
-                        g_i = shared_data["gradients"][-1].sum(dim=1)
+                    g_i = shared_data["gradients"][weight_grad_loc].sum(dim=1)
                     m_query = (
                         torch.where(g_i < 0, g_i, torch.zeros_like(g_i)).sum() * (1 + 1 / num_classes) / num_data_points
                     )
@@ -387,7 +267,7 @@ class _BaseAttacker:
                 print("Starting a white-box search for optimal labels. This will take some time.")
                 for query_id, model in enumerate(rec_models):
                     # Estimate m:
-                    weight_params = (list(rec_models[0].parameters())[-2],)
+                    weight_params = (list(rec_models[0].parameters())[weight_grad_loc],)
                     for class_idx in range(num_classes):
                         fake_data = torch.randn([num_data_points, *self.data_shape], **self.setup)
                         fake_labels = torch.as_tensor([class_idx] * num_data_points, **self.setup)
@@ -413,17 +293,9 @@ class _BaseAttacker:
 
             # After determining impact and offset, run the actual recovery algorithm
             label_list = []
-            # TODO: make more elegant
-            loc = 0
-            if shared_data["gradients"][-1].numel() == 100:
-                loc = -2
-            else:
-                # last gradient is weights
-                loc = -1
-            g_per_query = [shared_data["gradients"][loc].sum(dim=1) for shared_data in user_data]
+            g_per_query = [shared_data["gradients"][weight_grad_loc].sum(dim=1) for shared_data in user_data]
             g_i = torch.stack(g_per_query).mean(dim=0)
             # Stage 1:
-            # modified to work when activation is not non-negative and there are more negative indices than batch size
             negative_indices = torch.nonzero(g_i.squeeze() < 0).squeeze()
             if negative_indices.numel() == 0:
                 certain_labels = []
@@ -433,21 +305,16 @@ class _BaseAttacker:
             for lab in certain_labels:
                 label_list.append(torch.as_tensor(lab, device=self.setup["device"]))
 
-            # for idx in range(num_classes):
-            #     if g_i[idx] < 0:
-            #         label_list.append(torch.as_tensor(idx, device=self.setup["device"]))
-            #         g_i[idx] -= m_impact
             # Stage 2:
             g_i = g_i - s_offset
             while len(label_list) < num_data_points:
                 selected_idx = g_i.argmin()
                 label_list.append(torch.as_tensor(selected_idx, device=self.setup["device"]))
-                # this was "idx" instead of "selected_idx" before!!!!
                 g_i[selected_idx] -= m_impact
             # Finalize labels:
             labels = torch.stack(label_list)
 
-        elif self.cfg.label_strategy == "bias-corrected":  # WIP
+        elif self.cfg.label_strategy == "ebi":  
             # This is slightly modified analytic label recovery in the style of Wainakh
             bias_per_query = [shared_data["gradients"][-1] for shared_data in user_data]
             label_list = []
@@ -457,8 +324,7 @@ class _BaseAttacker:
             sorted_indices = torch.argsort(average_bias[valid_classes.squeeze()]).view(-1)
             for i in range(min(num_data_points, len(valid_classes))):
                 label_list.append(valid_classes[sorted_indices[i]].squeeze())
-            # label_list += [*valid_classes.squeeze(dim=-1)]
-            m_impact = average_bias_correct_label = average_bias[valid_classes].sum() / num_data_points
+            m_impact = average_bias[valid_classes].sum() / num_data_points
 
             average_bias[valid_classes] = average_bias[valid_classes] - m_impact
             # Stage 2
@@ -467,31 +333,8 @@ class _BaseAttacker:
                 label_list.append(selected_idx)
                 average_bias[selected_idx] -= m_impact
             labels = torch.stack(label_list)
-        elif self.cfg.label_strategy == "bias-text":  # WIP
-            num_missing_labels = num_data_points * self.data_shape[0]
-            # This is slightly modified analytic label recovery in the style of Wainakh
-            bias_per_query = [shared_data["gradients"][-1] for shared_data in user_data]
-            label_list = []
-            # Stage 1
-            average_bias = torch.stack(bias_per_query).mean(dim=0)
-            valid_classes = (average_bias < 0).nonzero()
-            label_list += [*valid_classes.squeeze(dim=-1)]
-            tokens_in_input = embeddings[0]["grads"].norm(dim=-1).nonzero().squeeze(dim=-1)
-            for token in tokens_in_input:
-                if token not in label_list:
-                    label_list.append(token)
 
-            m_impact = average_bias_correct_label = average_bias[valid_classes].sum() / num_missing_labels
-
-            average_bias[valid_classes] = average_bias[valid_classes] - m_impact
-            # Stage 2
-            while len(label_list) < num_missing_labels:
-                selected_idx = average_bias.argmin()
-                label_list.append(selected_idx)
-                average_bias[selected_idx] -= m_impact
-            labels = torch.stack(label_list).view(num_data_points, self.data_shape[0])
-
-        elif self.cfg.label_strategy == "bias-theory":  
+        elif self.cfg.label_strategy == "llbg":  
             # our variant of Wainakh's attack using bias gradient and theoretical value for impact
             bias_per_query = [shared_data["gradients"][-1] for shared_data in user_data]
             label_list = []
@@ -512,10 +355,8 @@ class _BaseAttacker:
             for cls in valid_classes:
                 model_conf = self.conf_stats[cls.item()]
                 average_bias[cls] -= m_impact * (1 - model_conf)
-            # average_bias[valid_classes] = average_bias[valid_classes] - m_impact
 
             # if the model is untrained, we have a positive offset of number of local steps divided by number of classes
-            # TODO: implement this only if untrained?
             average_bias -= num_steps / num_classes
 
             # Stage 2
@@ -529,16 +370,6 @@ class _BaseAttacker:
         elif self.cfg.label_strategy == "random":
             # A random baseline
             labels = torch.randint(0, num_classes, (num_data_points,), device=self.setup["device"])
-        elif self.cfg.label_strategy == "exhaustive":
-            # Exhaustive search is possible in principle
-            combinations = num_classes**num_data_points
-            raise ValueError(
-                f"Exhaustive label searching not implemented. Nothing stops you though from running your"
-                f"attack algorithm for any possible combination of labels, except computational effort."
-                f"In the given setting, a naive exhaustive strategy would attack {combinations} label vectors."
-            )
-            # Although this is arguably a worst-case estimate, you might be able to get "close enough" to the actual
-            # label vector in much fewer queries, depending on which notion of close-enough makes sense for a given attack.
         else:
             raise ValueError(f"Invalid label recovery strategy {self.cfg.label_strategy} given.")
 
@@ -552,190 +383,3 @@ class _BaseAttacker:
         labels = labels.sort()[0]
         log.info(f"Recovered labels {labels.tolist()} through strategy {self.cfg.label_strategy}.")
         return labels
-
-    def recover_token_information(self, user_data, server_payload, model_name):
-        """Recover token information. This is a variation of previous attacks on label recovery, but can abuse
-        the embeddings layer in addition to the decoder layer.
-
-        The behavior with respect to multiple queries is work in progress and subject of debate.
-        """
-        if self.cfg.token_strategy is None:
-            return None
-        embedding_parameter_idx, decoder_bias_parameter_idx = lookup_grad_indices(model_name)
-        num_data_points = user_data[0]["metadata"]["num_data_points"]
-        num_queries = len(user_data)
-        token_cutoff = getattr(self.cfg, "token_cutoff", 3.5)
-
-        # have to assert that this is the real decoder bias and embedding
-        if decoder_bias_parameter_idx is not None:
-            bias_per_query = [shared_data["gradients"][decoder_bias_parameter_idx] for shared_data in user_data]
-            assert len(bias_per_query[0]) == server_payload[0]["metadata"]["vocab_size"]
-
-        wte_per_query = [shared_data["gradients"][embedding_parameter_idx] for shared_data in user_data]
-        assert wte_per_query[0].shape[0] == server_payload[0]["metadata"]["vocab_size"]
-
-        num_missing_tokens = num_data_points * self.data_shape[0]
-
-        if self.cfg.token_strategy == "decoder-bias":
-            if decoder_bias_parameter_idx is None:
-                raise ValueError("Cannot use this strategy on a model without decoder bias.")
-            # works super well for normal stuff like transformer3 without tying
-
-            # This is slightly modified analytic label recovery in the style of Wainakh
-
-            token_list = []
-            # Stage 1
-            average_bias = torch.stack(bias_per_query).mean(dim=0)
-            average_wte_norm = torch.stack(wte_per_query).mean(dim=0).norm(dim=1)
-            valid_classes = (average_bias < 0).nonzero().squeeze(dim=-1)
-            if len(valid_classes) > num_missing_tokens:
-                # This should only happen due to numerical errors for bias or gradient noise:
-                valid_classes = average_bias.topk(k=num_missing_tokens - 1, largest=False).indices
-            token_list += [*valid_classes]
-            # Supplement with missing tokens from input:
-            std, mean = torch.std_mean(average_wte_norm.log())
-            cutoff = mean + token_cutoff * std
-            if not cutoff.isfinite():  # untied weights
-                tokens_in_input = average_wte_norm.nonzero().squeeze(dim=-1)
-            else:  # tied weights
-                tokens_in_input = (average_wte_norm.log() > cutoff).nonzero().squeeze(dim=-1)
-            for token in tokens_in_input:
-                if token not in token_list:
-                    token_list.append(token)
-
-            m_impact = average_bias_correct_label = average_bias[valid_classes].sum() / num_missing_tokens
-
-            average_bias[valid_classes] = average_bias[valid_classes] - m_impact
-            # Stage 2
-            while len(token_list) < num_missing_tokens:
-                selected_idx = average_bias.argmin()
-                token_list.append(selected_idx)
-                average_bias[selected_idx] -= m_impact
-            tokens = torch.stack(token_list).view(num_data_points, self.data_shape[0])
-
-        elif self.cfg.token_strategy == "embedding-norm":
-            # This works decently well for GPT which has no decoder bias
-            token_list = []
-            # Stage 1
-            average_wte_norm = torch.stack(wte_per_query).mean(dim=0).norm(dim=1)
-            std, mean = torch.std_mean(average_wte_norm.log())
-
-            valid_classes = []
-            while len(valid_classes) == 0:  # Loop is usually unnecessary, but can recover from a bad cutoff
-                cutoff = mean + token_cutoff * std
-                if not cutoff.isfinite():  # untied weights
-                    valid_classes = average_wte_norm.nonzero().squeeze(dim=-1)
-                else:  # tied weights
-                    valid_classes = (average_wte_norm.log() > cutoff).nonzero().squeeze(dim=-1)
-                token_cutoff *= 0.8
-            if cutoff.isfinite():
-                log.info(f"Proceeded to cut estimated token distribution at {token_cutoff / 0.8:2.2f}.")
-
-            if len(valid_classes) > num_missing_tokens:  # Cutoff overshoot
-                valid_classes = average_wte_norm.topk(k=num_missing_tokens).indices
-            token_list += [*valid_classes]
-
-            # top2-log rule is decent:
-            # top2 = average_wte_norm.log().topk(k=2).values  # log here is not an accident!
-            # m_impact = top2[0] - top2[1]
-            # but the sum is simpler:
-            m_impact = average_wte_norm[valid_classes].sum() / num_missing_tokens
-
-            average_wte_norm[valid_classes] = average_wte_norm[valid_classes] - m_impact
-            # Stage 2
-            while len(token_list) < num_missing_tokens:
-                selected_idx = valid_classes[average_wte_norm[valid_classes].argmax()]
-                token_list.append(selected_idx)
-                average_wte_norm[selected_idx] -= m_impact
-            tokens = torch.stack(token_list)
-
-        elif self.cfg.token_strategy == "embedding-log":
-            # Small variation of embedding-norm
-            token_list = []
-            # Stage 1
-            average_wte_norm = torch.stack(wte_per_query).mean(dim=0).norm(dim=1)
-            std, mean = torch.std_mean(average_wte_norm.log())
-            valid_classes = []
-            while len(valid_classes) == 0:
-                cutoff = mean + token_cutoff * std
-                if not cutoff.isfinite():  # untied weights
-                    valid_classes = average_wte_norm.nonzero().squeeze(dim=-1)
-                else:  # tied weights
-                    valid_classes = (average_wte_norm.log() > cutoff).nonzero().squeeze(dim=-1)
-                token_cutoff *= 0.8
-            if cutoff.isfinite():
-                log.info(f"Proceeded to cut estimated token distribution at {token_cutoff / 0.8:2.2f}.")
-            if len(valid_classes) > num_missing_tokens:  # Cutoff overshoot
-                valid_classes = average_wte_norm.topk(k=num_missing_tokens).indices
-            token_list += [*valid_classes]
-
-            average_wte_norm_log = average_wte_norm.log()
-            m_impact = average_wte_norm_log[valid_classes].max() / torch.as_tensor(num_data_points).sqrt()
-            # Stage 2
-            while len(token_list) < num_missing_tokens:
-                selected_idx = valid_classes[average_wte_norm_log[valid_classes].argmax()].squeeze()
-                token_list.append(selected_idx)
-                average_wte_norm_log[selected_idx] -= m_impact
-            tokens = torch.stack(token_list)
-
-        elif self.cfg.token_strategy == "mixed":
-            # Can improve performance for tied embeddings over just decoder-bias
-            # as unique token extraction is slightly more exact from the embedding layer
-
-            token_list = []
-            # Stage 1
-            average_bias = torch.stack(bias_per_query).mean(dim=0)
-            average_wte_norm = torch.stack(wte_per_query).mean(dim=0).norm(dim=1)
-            std, mean = torch.std_mean(average_wte_norm.log())
-            valid_classes = []
-            while len(valid_classes) == 0:
-                cutoff = mean + token_cutoff * std
-                if not cutoff.isfinite():  # untied weights
-                    valid_classes = average_wte_norm.nonzero().squeeze(dim=-1)
-                else:  # tied weights
-                    valid_classes = (average_wte_norm.log() > cutoff).nonzero().squeeze(dim=-1)
-                token_cutoff *= 0.8
-            if cutoff.isfinite():
-                log.info(f"Proceeded to cut estimated token distribution at {token_cutoff / 0.8:2.2f}.")
-            token_list += [*valid_classes]
-
-            m_impact = average_bias[valid_classes].sum() / num_missing_tokens
-            average_bias[valid_classes] = average_bias[valid_classes] - m_impact
-            # Stage 2
-            while len(token_list) < num_missing_tokens:
-                selected_idx = valid_classes[average_bias[valid_classes].argmin()]
-                token_list.append(selected_idx)
-                average_bias[selected_idx] -= m_impact
-            tokens = torch.stack(token_list)
-
-        elif self.cfg.token_strategy == "greedy-embedding":
-            # Sanity check without unique token selection
-            token_list = []
-            # Stage 1
-            average_wte_norm = torch.stack(wte_per_query).mean(dim=0).norm(dim=1)
-            m_impact = average_wte_norm.sum() / num_missing_tokens
-            # Stage 2
-            while len(token_list) < num_missing_tokens:
-                selected_idx = average_wte_norm.argmin()
-                token_list.append(selected_idx)
-                average_bias[selected_idx] -= m_impact
-            tokens = torch.stack(token_list)
-        elif self.cfg.token_strategy == "greedy-bias":
-            # Sanity check without unique token selection
-            token_list = []
-            # Stage 1
-            average_bias = torch.stack(bias_per_query).mean(dim=0)
-            m_impact = average_bias.sum() / num_missing_tokens
-            # Stage 2
-            while len(token_list) < num_missing_tokens:
-                selected_idx = average_bias.argmin()
-                token_list.append(selected_idx)
-                average_bias[selected_idx] -= m_impact
-            tokens = torch.stack(token_list)
-        else:
-            raise ValueError(f"Invalid strategy {self.cfg.token_strategy} for token recovery before attack.")
-
-        # Always sort, order does not matter here:
-        tokens = tokens.sort()[0]
-        log.info(f"Recovered tokens {tokens} through strategy {self.cfg.token_strategy}.")
-        return tokens

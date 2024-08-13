@@ -58,7 +58,7 @@ def main_process(process_idx, local_group_size, cfg):
         breaching.utils.save_reconstruction(reconstructed_user_data, payloads, true_user_data, cfg)
 
 
-@hydra.main(config_path="breaching/config", config_name="my_cfg", version_base="1.1")
+@hydra.main(config_path="breaching/config", config_name="cfg", version_base="1.1")
 def main_launcher(cfg):
     """This is boiler-plate code for the launcher."""
 

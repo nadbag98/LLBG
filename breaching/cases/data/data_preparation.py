@@ -24,22 +24,11 @@ def construct_dataloader(cfg_data, cfg_impl, user_idx=0, return_full_dataset=Fal
 
         dataset, collate_fn = _build_dataset_vision(cfg_data, split=cfg_data.examples_from_split, can_download=True)
         dataset = _split_dataset_vision(dataset, cfg_data, user_idx, return_full_dataset)
-    elif cfg_data.modality == "text":
-        from .datasets_text import _build_and_split_dataset_text
-
-        dataset, collate_fn = _build_and_split_dataset_text(
-            cfg_data, cfg_data.examples_from_split, user_idx, return_full_dataset,
-        )
     else:
         raise ValueError(f"Unknown data modality {cfg_data.modality}.")
 
     if len(dataset) == 0:
         raise ValueError("This user would have no data under the chosen partition, user id and number of clients.")
-
-    if cfg_data.db.name == "LMDB":
-        from .lmdb_datasets import LMDBDataset  # this also depends on py-lmdb, that's why it's a lazy import
-
-        dataset = LMDBDataset(dataset, cfg_data, cfg_data.examples_from_split, can_create=True)
 
     if cfg_data.caching:
         dataset = CachedDataset(dataset, num_workers=cfg_impl.threads, pin_memory=cfg_impl.pin_memory)

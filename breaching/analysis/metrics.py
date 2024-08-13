@@ -166,34 +166,6 @@ def _registered_psnr_compute_kornia(img_batch, ref_batch, factor=1.0):
     return result.mean().item(), result.max().item()
 
 
-def _registered_psnr_compute_kornia_loftr(img_batch, ref_batch, factor=1.0):
-    """Kornia version. WIP."""
-    try:
-        from kornia.feature import LoFTR
-        from kornia.geometry.homography import find_homography_dlt
-    except ModuleNotFoundError:
-        warnings.warn("To utilize this registered PSNR implementation, install kornia.")
-        return torch.as_tensor(float("NaN")), torch.as_tensor(float("NaN"))
-
-    B = img_batch.shape[0]
-    mse_per_example = ((img_batch.detach() - ref_batch) ** 2).view(B, -1).mean(dim=1)
-    default_psnrs = 10 * torch.log10(factor ** 2 / mse_per_example)
-    # Align by homography:
-    matcher = LoFTR(pretrained="indoor")
-    with torch.no_grad():
-        correspondences_dict = matcher(
-            dict(image0=img_batch.mean(dim=1, keepdim=True), image1=ref_batch.mean(dim=1, keepdim=True))
-        )
-        homography = find_homography_dlt(correspondences_dict["keypoints0"], correspondences_dict["keypoints1"])
-        warped_imgs = homography_warp(img_batch, homography, ref_batch.shape[-2:])
-    # Compute new PSNR:
-    mse_per_example = ((warped_imgs.detach() - ref_batch) ** 2).view(B, -1).mean(dim=1)
-    registered_psnrs = 10 * torch.log10(factor ** 2 / mse_per_example)
-
-    # Return best of default and warped PSNR:
-    return torch.stack([default_psnrs, registered_psnrs]).max(dim=0)[0].mean()
-
-
 def _registered_psnr_compute_skimage(img_batch, ref_batch, factor=1.0):
     """Use ORB features to register images onto reference before computing PSNR scores."""
     try:

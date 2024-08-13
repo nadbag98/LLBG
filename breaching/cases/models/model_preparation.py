@@ -7,18 +7,14 @@ from collections import OrderedDict
 
 from .resnets import ResNet, resnet_depths_to_config
 from .densenets import DenseNet, densenet_depths_to_config
-from .nfnets import NFNet
 from .vgg import VGG
 
-from .language_models import RNNModel, TransformerModel, LinearModel
 from .losses import CausalLoss, MLMLoss, MostlyCausalLoss
 
 
 def construct_model(cfg_model, cfg_data, pretrained=True, **kwargs):
     if cfg_data.modality == "vision":
         model = _construct_vision_model(cfg_model, cfg_data, pretrained, **kwargs)
-    elif cfg_data.modality == "text":
-        model = _construct_text_model(cfg_model, cfg_data, pretrained, **kwargs)
     else:
         raise ValueError(f"Invalid data modality {cfg_data.modality}")
     # Save nametag for printouts later:
@@ -27,126 +23,10 @@ def construct_model(cfg_model, cfg_data, pretrained=True, **kwargs):
     # Choose loss function according to data and model:
     if "classification" in cfg_data.task:
         loss_fn = torch.nn.CrossEntropyLoss()
-    elif "causal-lm-sanity" in cfg_data.task:
-        loss_fn = MostlyCausalLoss()
-    elif "causal-lm" in cfg_data.task:
-        loss_fn = CausalLoss()
-    elif "masked-lm" in cfg_data.task:
-        loss_fn = MLMLoss(vocab_size=cfg_data.vocab_size)
     else:
         raise ValueError(f"No loss function registered for task {cfg_data.task}.")
     loss_fn = torch.jit.script(loss_fn)
     return model, loss_fn
-
-
-def _construct_text_model(cfg_model, cfg_data, pretrained=True, **kwargs):
-    if cfg_model == "transformer3f":
-        # This is the transformer from "A field guide to federated learning"
-        """
-        we train a modified 3-layer Transformer model [250],
-        where the dimension of the token embeddings is 96, and the hidden dimension of the feed-forward
-        network (FFN) block is 1536. We use 8 heads for the multi-head attention, where each head is based
-        on 12-dimensional (query, key, value) vectors. We use ReLU activation and set dropout rate to 0.1.
-        """
-        # For simplicity the dropout is disabled for now
-        # the 12-dim query is 96/8 = 12
-        model = TransformerModel(
-            ntokens=cfg_data.vocab_size, ninp=96, nhead=8, nhid=1536, nlayers=3, dropout=0, positional_embedding="fixed"
-        )
-    elif cfg_model == "transformer3":
-        # Same as above but with learnable positional embeddings
-        model = TransformerModel(
-            ntokens=cfg_data.vocab_size,
-            ninp=96,
-            nhead=8,
-            nhid=1536,
-            nlayers=3,
-            dropout=0,
-            positional_embedding="learnable",
-        )
-    elif cfg_model == "transformer3t":
-        # Same as above but with learnable positional embeddings and tied weights
-        model = TransformerModel(
-            ntokens=cfg_data.vocab_size,
-            ninp=96,
-            nhead=8,
-            nhid=1536,
-            nlayers=3,
-            dropout=0,
-            positional_embedding="learnable",
-            tie_weights=True,
-        )
-    elif cfg_model == "transformer1":
-        # This is our initial sanity check transformer:
-        model = TransformerModel(ntokens=cfg_data.vocab_size, ninp=200, nhead=1, nhid=200, nlayers=1, dropout=0)
-    elif cfg_model == "transformerS":
-        # A wide sanity-check transformer
-        model = TransformerModel(ntokens=cfg_data.vocab_size, ninp=512, nhead=1, nhid=512, nlayers=1, dropout=0)
-    elif cfg_model == "LSTM":
-        # This is the LSTM from "LEARNING DIFFERENTIALLY PRIVATE RECURRENT LANGUAGE MODELS"
-        """
-        word s t is mapped to an embedding vector e t ∈ R 96
-        by looking up the word in the model’s vocabulary. The e t is composed with the state emitted by
-        the model in the previous time step s t−1 ∈ R 256 to emit a new state vector s t and an “output
-        embedding” o t ∈ R 96 .
-        """
-        model = RNNModel("LSTM", cfg_data.vocab_size, ninp=96, nhid=96, nlayers=1, dropout=0.0, tie_weights=True)
-    elif cfg_model == "linear":
-        model = LinearModel(cfg_data.vocab_size, embedding_size=200)
-    else:
-        try:
-            from transformers import (
-                AutoModelForMaskedLM,
-                AutoModelForPreTraining,
-                AutoModelForSequenceClassification,
-                AutoConfig,
-            )
-
-            if cfg_data.task == "masked-lm":
-                auto_class = AutoModelForMaskedLM
-            elif cfg_data.task == "classification":
-                auto_class = AutoModelForSequenceClassification
-            else:
-                auto_class = AutoModelForPreTraining
-            # Make sure to use the matching tokenizer and vocab_size!
-            if cfg_model == "gpt2S":
-                cfg_model = "gpt2"
-                extra_args = dict(activation_function="relu", resid_pdrop=0.0, embd_pdrop=0.0, attn_pdrop=0.0)
-            elif cfg_model == "bert-sanity-check":
-                cfg_model = "bert-base-uncased"
-                extra_args = dict(hidden_act="relu", hidden_dropout_prob=0.0, attention_probs_dropout_prob=0.0)
-            else:
-                extra_args = dict()
-            if pretrained:
-                model = auto_class.from_pretrained(cfg_model, **extra_args)
-            else:
-                hf_cfg = AutoConfig.from_pretrained(cfg_model, **extra_args)
-                model = auto_class.from_config(hf_cfg)
-            # model.transformer.h[0].attn.scale_attn_weights = False
-            if model.config.vocab_size != cfg_data.vocab_size:
-                model.resize_token_embeddings(new_num_tokens=cfg_data.vocab_size)
-            model = HuggingFaceContainer(model)
-        except OSError as error_msg:
-            raise ValueError(f"Invalid huggingface model {cfg_model} given: {error_msg}")
-    return model
-
-
-class HuggingFaceContainer(torch.nn.Module):
-    """Wrap huggingface models for a unified interface. Ugh."""
-
-    def __init__(self, model):
-        super().__init__()
-        self.model = model
-
-    def forward(self, *args, **kwargs):
-        if "inputs" in kwargs:
-            kwargs["input_ids"] = kwargs.pop("inputs")
-        if "input_ids" not in kwargs:
-            kwargs["input_ids"] = args[0]
-        if kwargs["input_ids"].dtype != torch.long:
-            kwargs["inputs_embeds"] = kwargs.pop("input_ids")
-        outputs = self.model(**kwargs)
-        return outputs["logits"] if "logits" in outputs else outputs["prediction_logits"]
 
 
 class VisionContainer(torch.nn.Module):
@@ -178,19 +58,7 @@ def _construct_vision_model(cfg_model, cfg_data, pretrained=True, **kwargs):
             except AttributeError:
                 pass
         except AttributeError:
-            if "nfnet" in cfg_model:
-                model = NFNet(
-                    channels,
-                    classes,
-                    variant="F0",
-                    stochdepth_rate=0.25,
-                    alpha=0.2,
-                    se_ratio=0.5,
-                    activation="ReLU",
-                    stem="ImageNet",
-                    use_dropout=True,
-                )
-            elif "resnet101wsl" in cfg_model:
+            if "resnet101wsl" in cfg_model:
                 model = torch.hub.load("facebookresearch/WSL-Images", "resnext101_32x8d_wsl")
             elif "resnet50swsl" in cfg_model:
                 model = torch.hub.load("facebookresearch/semi-supervised-ImageNet1K-models", "resnet50_swsl")
@@ -331,18 +199,6 @@ def _construct_vision_model(cfg_model, cfg_data, pretrained=True, **kwargs):
         elif "linear" in cfg_model:
             input_dim = cfg_data.shape[0] * cfg_data.shape[1] * cfg_data.shape[2]
             model = torch.nn.Sequential(torch.nn.Flatten(), torch.nn.Linear(input_dim, classes))
-        elif "nfnet" in cfg_model:
-            model = NFNet(
-                channels,
-                classes,
-                variant="F0",
-                stochdepth_rate=0.25,
-                alpha=0.2,
-                se_ratio=0.5,
-                activation="ReLU",
-                stem="CIFAR",
-                use_dropout=True,
-            )
         elif "convnet-trivial" == cfg_model.lower():
             model = torch.nn.Sequential(
                 OrderedDict(

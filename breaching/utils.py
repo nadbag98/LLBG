@@ -224,55 +224,29 @@ def save_reconstruction(
     """If target_indx is not None, only the datapoints at target_indx will be saved to file."""
     os.makedirs("reconstructions", exist_ok=True)
     metadata = server_payload[0]["metadata"]
-    if metadata["modality"] == "text":
-        from breaching.cases.data.datasets_text import _get_tokenizer
-
-        tokenizer = _get_tokenizer(
-            server_payload[0]["metadata"]["tokenizer"],
-            server_payload[0]["metadata"]["vocab_size"],
-            cache_dir=cfg.case.data.path,
-        )
-        text_rec = tokenizer.batch_decode(reconstructed_user_data["data"])
-        text_ref = tokenizer.batch_decode(true_user_data["data"])
-        if target_indx is not None:
-            text_rec = text_rec[target_indx]
-            text_ref = text_ref[target_indx]
-
-        filepath = os.path.join(
-            "reconstructions", f"text_rec_{cfg.case.data.name}_{cfg.case.model}_user{cfg.case.user.user_idx}.txt"
-        )
-
-        with open(filepath, "w") as f:
-            f.writelines(text_rec)
-            if side_by_side:
-                f.write("\n")
-                f.write("========== GROUND TRUTH TEXT ===========")
-                f.write("\n")
-                f.writelines(text_ref)
+    if hasattr(metadata, "mean"):
+        dm = torch.as_tensor(metadata.mean)[None, :, None, None]
+        ds = torch.as_tensor(metadata.std)[None, :, None, None]
     else:
-        if hasattr(metadata, "mean"):
-            dm = torch.as_tensor(metadata.mean)[None, :, None, None]
-            ds = torch.as_tensor(metadata.std)[None, :, None, None]
-        else:
-            dm, ds = torch.tensor(
-                0,
-            ), torch.tensor(1)
+        dm, ds = torch.tensor(
+            0,
+        ), torch.tensor(1)
 
-        rec_denormalized = torch.clamp(reconstructed_user_data["data"].cpu() * ds + dm, 0, 1)
-        ground_truth_denormalized = torch.clamp(true_user_data["data"].cpu() * ds + dm, 0, 1)
-        if target_indx is not None:
-            rec_denormalized = rec_denormalized[target_indx]
-            ground_truth_denormalized = ground_truth_denormalized[target_indx]
+    rec_denormalized = torch.clamp(reconstructed_user_data["data"].cpu() * ds + dm, 0, 1)
+    ground_truth_denormalized = torch.clamp(true_user_data["data"].cpu() * ds + dm, 0, 1)
+    if target_indx is not None:
+        rec_denormalized = rec_denormalized[target_indx]
+        ground_truth_denormalized = ground_truth_denormalized[target_indx]
 
-        filepath = os.path.join(
-            "reconstructions",
-            f"img_rec_{cfg.case.data.name}_{cfg.case.model}_user{cfg.case.user.user_idx}.png",
-        )
+    filepath = os.path.join(
+        "reconstructions",
+        f"img_rec_{cfg.case.data.name}_{cfg.case.model}_user{cfg.case.user.user_idx}.png",
+    )
 
-        if not side_by_side:
-            torchvision.utils.save_image(rec_denormalized, filepath)
-        else:
-            torchvision.utils.save_image(torch.cat([rec_denormalized, ground_truth_denormalized]), filepath)
+    if not side_by_side:
+        torchvision.utils.save_image(rec_denormalized, filepath)
+    else:
+        torchvision.utils.save_image(torch.cat([rec_denormalized, ground_truth_denormalized]), filepath)
 
 
 def dump_metrics(cfg, metrics):

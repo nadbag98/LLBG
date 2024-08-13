@@ -91,7 +91,7 @@ def main():
     parser.add_argument("--weight_decay", type=float, default=0.0005)
     args = parser.parse_args()
 
-
+    # TODO: tidy up!!
     # model = VGG(
     #                 "VGG11",
     #                 in_channels=3,

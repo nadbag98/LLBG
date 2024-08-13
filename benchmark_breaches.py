@@ -32,7 +32,6 @@ def main_process(process_idx, local_group_size, cfg, num_trials=100):
 
     server = breaching.cases.construct_server(model, loss_fn, cfg.case, setup)
     model = server.vet_model(model)
-    # TODO: clean up passing last two args
     attacker = breaching.attacks.prepare_attack(model, loss_fn, cfg.attack, setup, cfg.case.model, cfg.case.data.name)
     if cfg.case.user.user_idx is not None:
         print("The argument user_idx is disregarded during the benchmark. Data selection is fixed.")
@@ -107,7 +106,7 @@ def main_process(process_idx, local_group_size, cfg, num_trials=100):
     )
 
 
-@hydra.main(config_path="breaching/config", config_name="my_cfg", version_base="1.1")
+@hydra.main(config_path="breaching/config", config_name="cfg", version_base="1.1")
 def main_launcher(cfg):
     """This is boiler-plate code for the launcher."""
 

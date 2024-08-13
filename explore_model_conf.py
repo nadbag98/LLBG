@@ -13,7 +13,7 @@ from breaching.cases.models.model_preparation import _construct_vision_model
 device = torch.device(f"cuda:0")
 #device = torch.device("cpu")
 
-@hydra.main(config_path="breaching/config", config_name="my_cfg", version_base="1.1")
+@hydra.main(config_path="breaching/config", config_name="cfg", version_base="1.1")
 def main_launcher(cfg):
     _default_t = torchvision.transforms.ToTensor()
     cfg.case.data.partition = "unique-class"
