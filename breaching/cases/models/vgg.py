@@ -27,196 +27,97 @@
 
 
 # """VGG11/13/16/19 in Pytorch."""
-# import torch
-# import torch.nn as nn
-
-# from .utils import get_layer_functions
-
-
-# cfg = {
-#     "VGG11": [64, "M", 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
-#     "VGG11n": [64, "M", 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
-#     "VGG13": [64, 64, "M", 128, 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
-#     "VGG16": [64, 64, "M", 128, 128, "M", 256, 256, 256, "M", 512, 512, 512, "M", 512, 512, 512, "M"],
-#     # 'VGG16-TI': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M', 'M'],
-#     "VGG19": [64, 64, "M", 128, 128, "M", 256, 256, 256, 256, "M", 512, 512, 512, 512, "M", 512, 512, 512, 512, "M"],
-# }
-
-
-# class VGG(nn.Module):
-#     def __init__(
-#         self,
-#         vgg_name,
-#         in_channels=3,
-#         num_classes=10,
-#         norm="BatchNorm2d",
-#         nonlin="ReLU",
-#         stem="CIFAR",
-#         convolution_type="Standard",
-#         head="CIFAR",
-#         drop_rate=0.0,
-#         classical_weight_init=False,
-#         use_bias=True,
-#     ):
-#         super().__init__()
-#         self._conv_layer, self._norm_layer, self._nonlin_layer = get_layer_functions(convolution_type, norm, nonlin)
-#         self.features = self._make_layers(cfg[vgg_name], in_channels)
-
-#         if head == "CIFAR":
-#             self.classifier = nn.Linear(512, num_classes, bias=use_bias)
-#         elif head == "TinyImageNet":
-#             self.classifier = torch.nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)), nn.Linear(512, num_classes))
-#         else:
-#             self.classifier = nn.Sequential(
-#                 nn.AdaptiveAvgPool2d((7, 7)),
-#                 nn.Linear(512 * 7 * 7, 4096),
-#                 nn.ReLU(True),
-#                 nn.Dropout(drop_rate),
-#                 nn.Linear(4096, 4096),
-#                 nn.ReLU(True),
-#                 nn.Dropout(drop_rate),
-#                 nn.Linear(4096, num_classes),
-#             )
-
-#         if classical_weight_init:
-#             self._initialize_weights()
-
-#     def forward(self, x):
-#         out = self.features(x)
-#         out = out.view(out.size(0), -1)
-#         out = self.classifier(out)
-#         return out
-
-#     def _make_layers(self, cfg, in_channels):
-#         layers = []
-#         for x in cfg:
-#             if x == "M":
-#                 layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
-#             else:
-#                 layers += [
-#                     self._conv_layer(in_channels, x, kernel_size=3, padding=1),
-#                     self._norm_layer(x),
-#                     self._nonlin_layer(),
-#                 ]
-#                 in_channels = x
-#         layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
-#         return nn.Sequential(*layers)
-
-#     def _initialize_weights(self) -> None:
-#         for m in self.modules():
-#             if isinstance(m, nn.Conv2d):
-#                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
-#                 if m.bias is not None:
-#                     nn.init.constant_(m.bias, 0)
-#             elif isinstance(m, nn.BatchNorm2d):
-#                 nn.init.constant_(m.weight, 1)
-#                 nn.init.constant_(m.bias, 0)
-#             elif isinstance(m, nn.Linear):
-#                 nn.init.normal_(m.weight, 0, 0.01)
-#                 nn.init.constant_(m.bias, 0)
-
-
-# def test():
-#     net = VGG("VGG11")
-#     x = torch.randn(2, 3, 32, 32)
-#     y = net(x)
-#     print(y.size())
-
-
-# # test()
-
-"""vgg in pytorch
-
-
-[1] Karen Simonyan, Andrew Zisserman
-
-    Very Deep Convolutional Networks for Large-Scale Image Recognition.
-    https://arxiv.org/abs/1409.1556v6
-"""
-'''VGG11/13/16/19 in Pytorch.'''
-
 import torch
 import torch.nn as nn
 
+from .utils import get_layer_functions
+
+
 cfg = {
-    'vgg11' : [64,     'M', 128,      'M', 256, 256,           'M', 512, 512,           'M', 512, 512,           'M'],
-    'vgg11n' : [64,     'M', 128,      'M', 256, 256,           'M', 512, 512,           'M', 512, 512,           'M'],
-    'B' : [64, 64, 'M', 128, 128, 'M', 256, 256,           'M', 512, 512,           'M', 512, 512,           'M'],
-    'D' : [64, 64, 'M', 128, 128, 'M', 256, 256, 256,      'M', 512, 512, 512,      'M', 512, 512, 512,      'M'],
-    'E' : [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M']
+    "VGG11": [64, "M", 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
+    "VGG11n": [64, "M", 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
+    "VGG13": [64, 64, "M", 128, 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
+    "VGG16": [64, 64, "M", 128, 128, "M", 256, 256, 256, "M", 512, 512, 512, "M", 512, 512, 512, "M"],
+    # 'VGG16-TI': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M', 'M'],
+    "VGG19": [64, 64, "M", 128, 128, "M", 256, 256, 256, 256, "M", 512, 512, 512, 512, "M", 512, 512, 512, 512, "M"],
 }
 
+
 class VGG(nn.Module):
-
     def __init__(
-            self,
-            vgg_name,
-            in_channels=3,
-            num_classes=10,
-            norm="BatchNorm2d",
-            nonlin="ReLU",
-            stem="CIFAR",
-            convolution_type="Standard",
-            head="CIFAR",
-            drop_rate=0.0,
-            classical_weight_init=False,
-            use_bias=True,
+        self,
+        vgg_name,
+        in_channels=3,
+        num_classes=10,
+        norm="BatchNorm2d",
+        nonlin="ReLU",
+        stem="CIFAR",
+        convolution_type="Standard",
+        head="CIFAR",
+        drop_rate=0.0,
+        classical_weight_init=False,
+        use_bias=True,
     ):
-            # self, features, num_class=100, use_bias=True):
         super().__init__()
-        # self.features = features
-        self.features = make_layers(cfg[vgg_name.lower()], batch_norm=True)
+        self._conv_layer, self._norm_layer, self._nonlin_layer = get_layer_functions(convolution_type, norm, nonlin)
+        self.features = self._make_layers(cfg[vgg_name], in_channels)
 
-        self.classifier = nn.Sequential(
-            nn.Linear(512, 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, num_classes, bias=use_bias)
-        )
+        if head == "CIFAR":
+            self.classifier = nn.Linear(512, num_classes, bias=use_bias)
+        elif head == "TinyImageNet":
+            self.classifier = torch.nn.Sequential(nn.AdaptiveAvgPool2d((1, 1)), nn.Linear(512, num_classes))
+        else:
+            self.classifier = nn.Sequential(
+                nn.AdaptiveAvgPool2d((7, 7)),
+                nn.Linear(512 * 7 * 7, 4096),
+                nn.ReLU(True),
+                nn.Dropout(drop_rate),
+                nn.Linear(4096, 4096),
+                nn.ReLU(True),
+                nn.Dropout(drop_rate),
+                nn.Linear(4096, num_classes),
+            )
+
+        if classical_weight_init:
+            self._initialize_weights()
 
     def forward(self, x):
-        output = self.features(x)
-        output = output.view(output.size()[0], -1)
-        output = self.classifier(output)
+        out = self.features(x)
+        out = out.view(out.size(0), -1)
+        out = self.classifier(out)
+        return out
 
-        return output
+    def _make_layers(self, cfg, in_channels):
+        layers = []
+        for x in cfg:
+            if x == "M":
+                layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
+            else:
+                layers += [
+                    self._conv_layer(in_channels, x, kernel_size=3, padding=1),
+                    self._norm_layer(x),
+                    self._nonlin_layer(),
+                ]
+                in_channels = x
+        layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
+        return nn.Sequential(*layers)
 
-def make_layers(cfg, batch_norm=False):
-    layers = []
-
-    input_channel = 3
-    for l in cfg:
-        if l == 'M':
-            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
-            continue
-
-        layers += [nn.Conv2d(input_channel, l, kernel_size=3, padding=1)]
-
-        if batch_norm:
-            layers += [nn.BatchNorm2d(l)]
-
-        layers += [nn.ReLU(inplace=True)]
-        input_channel = l
-
-    return nn.Sequential(*layers)
-
-# def vgg11_bn():
-#     return VGG(make_layers(cfg['A'], batch_norm=True))
-
-# def vgg11n_bn():
-#     return VGG(make_layers(cfg['A'], batch_norm=True), use_bias=False)
-
-# def vgg13_bn():
-#     return VGG(make_layers(cfg['B'], batch_norm=True))
-
-# def vgg16_bn():
-#     return VGG(make_layers(cfg['D'], batch_norm=True))
-
-# def vgg19_bn():
-#     return VGG(make_layers(cfg['E'], batch_norm=True))
+    def _initialize_weights(self) -> None:
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                nn.init.constant_(m.bias, 0)
 
 
-
+def test():
+    net = VGG("VGG11")
+    x = torch.randn(2, 3, 32, 32)
+    y = net(x)
+    print(y.size())

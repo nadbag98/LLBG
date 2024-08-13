@@ -425,8 +425,11 @@ class _BaseAttacker:
             # Stage 1:
             # modified to work when activation is not non-negative and there are more negative indices than batch size
             negative_indices = torch.nonzero(g_i.squeeze() < 0).squeeze()
-            sorted_indices = torch.argsort(g_i[negative_indices].squeeze())
-            certain_labels = negative_indices[sorted_indices[:min(num_data_points, len(negative_indices))]].tolist()
+            if negative_indices.numel() == 0:
+                certain_labels = []
+            else:
+                sorted_indices = torch.argsort(g_i[negative_indices].squeeze())
+                certain_labels = negative_indices[sorted_indices[:min(num_data_points, negative_indices.numel())]].tolist()
             for lab in certain_labels:
                 label_list.append(torch.as_tensor(lab, device=self.setup["device"]))
 
@@ -498,7 +501,12 @@ class _BaseAttacker:
             label_list += [*valid_classes.squeeze(dim=-1)]
             # here is the difference from bias-corrected: impact is independant of gradient
             # this takes care to calculate impact correctly for fedavg
-            data_per_batch = user_data[0]["metadata"]["local_hyperparams"]["data_per_step"]
+            data_per_batch = num_data_points
+            num_steps = 1
+            if user_data[0]["metadata"]["local_hyperparams"] is not None:
+                # in fedavg, the batch size we need is the mini batch size and num of steps
+                data_per_batch = user_data[0]["metadata"]["local_hyperparams"]["data_per_step"]
+                num_steps = user_data[0]["metadata"]["local_hyperparams"]["steps"]
             m_impact = - 1 / data_per_batch
 
             for cls in valid_classes:
@@ -508,7 +516,6 @@ class _BaseAttacker:
 
             # if the model is untrained, we have a positive offset of number of local steps divided by number of classes
             # TODO: implement this only if untrained?
-            num_steps = user_data[0]["metadata"]["local_hyperparams"]["steps"]
             average_bias -= num_steps / num_classes
 
             # Stage 2
