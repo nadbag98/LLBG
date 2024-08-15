@@ -35,7 +35,7 @@ def main_process(process_idx, local_group_size, cfg):
 
     # Instantiate user and attacker
     user = breaching.cases.construct_user(model, loss_fn, cfg.case, setup)
-    attacker = breaching.attacks.prepare_attack(model, loss_fn, cfg.attack, setup)
+    attacker = breaching.attacks.prepare_attack(model, loss_fn, cfg.attack, setup, cfg.case.model, cfg.case.data.name)
     # Summarize startup:
     breaching.utils.overview(server, user, attacker)
 
