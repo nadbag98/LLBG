@@ -14,7 +14,7 @@ You can load any use case by
 cfg_case = breaching.get_case_config(case="6_large_batch_cifar")
 user, server, model, loss = breaching.cases.construct_case(cfg_case)
 ```
-and load any attack by
+and load the attack by
 ```
 cfg_attack = breaching.get_attack_config(attack="invertinggradients")
 attacker = breaching.attacks.prepare_attack(model, loss, cfg_attack)
@@ -56,10 +56,6 @@ Using the default scripts for benchmarking and cmd-line executes also includes a
 It is probably best to have a look into `breaching/config` to see all possible options.
 
 ### License
-We integrate several snippets of code from other repositories and refer to the licenses included in those files for more info.
-We're especially thankful for related projects such as https://www.tensorflow.org/federated, https://github.com/NVlabs/DeepInversion, https://github.com/JunyiZhu-AI/R-GAP, https://github.com/facebookresearch/functorch, https://github.com/ildoonet/pytorch-gradual-warmup-lr and https://github.com/nadavbh12/VQ-VAE from which we incorporate components.
+As mentioned above, we use the Breaching repository by Geiping et al. as a base for this repository.
 
 For the license of our code, refer to `LICENCE.md`.
-
-### Authors
-This framework was built by me ([Jonas Geiping](https://github.com/JonasGeiping)), [Liam Fowl](https://github.com/lhfowl) and [Yuxin Wen](https://github.com/YuxinWenRick) while working at the University of Maryland, College Park.
