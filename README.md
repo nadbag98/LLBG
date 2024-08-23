@@ -1,6 +1,6 @@
 # Harmful Bias: A General Label-Leakage Attack on Federated Learning from Bias Gradients
 
-This repository is based on the Breaching repository created by Geiping et al., that can be found [here]([url](https://github.com/JonasGeiping/breaching)).
+This repository is based on the Breaching repository created by Geiping et al., that can be found [here]([https://github.com/JonasGeiping/breaching]).
 It contains the code for the Label Leakage from Bias Gradients (LLBG) attack, and only files and code from the original repo to experiment with this attack.
 Also included are the baselines used - random label reconstruction attack, and different variants of the Label Leakage from Gradients (LLG) attack suggested by Wainakh et al.
 The only data reconstruction attack that appears in this repository is the "Inverting Gradients" attack suggested by Geiping et al., as it is the one we experiment with in our paper.
