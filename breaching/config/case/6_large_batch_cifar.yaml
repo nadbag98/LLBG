@@ -2,11 +2,11 @@ name: large_batch_cifar
 
 defaults:
   - data: CIFAR100
-  - impl: default
+  - impl: default_windows
   - server: honest-but-curious
-  - user: local_gradient
+  - user: local_updates
   - _self_
-model: ResNet32-10
+model: MLP
 
 # Server and user:
 num_queries: 1

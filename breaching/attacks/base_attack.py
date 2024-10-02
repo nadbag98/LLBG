@@ -9,7 +9,6 @@ import pickle
 import os
 
 from .auxiliaries.common import optimizer_lookup
-from ..cases.models.transformer_dictionary import lookup_grad_indices
 
 import logging
 
@@ -240,16 +239,19 @@ class _BaseAttacker:
             num_classes = 100
         num_queries = len(user_data)
 
+
         if self.cfg.label_strategy is None:
             return None
+        else:
+            label_strat = self.cfg.label_strategy.lower()
 
-        elif "wainakh" in self.cfg.label_strategy:
+        if "llg" in label_strat:
             # TODO: verify this!!
             if shared_data["gradients"].shape[1] == 1:
                 weight_grad_loc = -2
             else:
                 weight_grad_loc = -1
-            if self.cfg.label_strategy == "wainakh-simple":
+            if label_strat == "llg-simple":
                 # As seen in Weinakh et al., "User Label Leakage from Gradients in Federated Learning"
                 m_impact = 0
                 for query_id, shared_data in enumerate(user_data):
@@ -259,7 +261,7 @@ class _BaseAttacker:
                     )
                     s_offset = 0
                     m_impact += m_query / num_queries
-            elif self.cfg.label_strategy == "wainakh-whitebox":
+            elif label_strat == "llg-whitebox":
                 # Augment previous strategy with measurements of label impact for dummy data.
                 m_impact = 0
                 s_offset = torch.zeros(num_classes, **self.setup)
@@ -289,7 +291,7 @@ class _BaseAttacker:
                         s_offset[class_idx] += W_cls.sum() / T / num_queries
 
             else:
-                raise ValueError(f"Invalid Wainakh strategy {self.cfg.label_strategy}.")
+                raise ValueError(f"Invalid llg strategy {self.cfg.label_strategy}.")
 
             # After determining impact and offset, run the actual recovery algorithm
             label_list = []
@@ -314,7 +316,7 @@ class _BaseAttacker:
             # Finalize labels:
             labels = torch.stack(label_list)
 
-        elif self.cfg.label_strategy == "ebi":  
+        elif label_strat == "ebi":  
             # This is slightly modified analytic label recovery in the style of Wainakh
             bias_per_query = [shared_data["gradients"][-1] for shared_data in user_data]
             label_list = []
@@ -334,8 +336,8 @@ class _BaseAttacker:
                 average_bias[selected_idx] -= m_impact
             labels = torch.stack(label_list)
 
-        elif self.cfg.label_strategy == "llbg":  
-            # our variant of Wainakh's attack using bias gradient and theoretical value for impact
+        elif label_strat == "llbg":  
+            # our attack using bias gradient and theoretical value for impact
             bias_per_query = [shared_data["gradients"][-1] for shared_data in user_data]
             label_list = []
             # Stage 1

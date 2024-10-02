@@ -16,7 +16,7 @@ optim:
   signed: "hard"
   step_size: 0.1
   boxed: True
-  max_iterations: 24_000
+  max_iterations: 1
   step_size_decay: step-lr
 
   callback: 1000 # Print objective value every callback many iterations

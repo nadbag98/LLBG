@@ -15,7 +15,7 @@ local_diff_privacy:
   compression_percent: 0.0
 
 # Specific to this user type:
-num_local_updates: 4
-num_data_per_local_update_step: 1 # Every step is taken on a different sample
+num_local_updates: 10
+num_data_per_local_update_step: 10 
 local_learning_rate: 0.001
 provide_local_hyperparams: True # Provide local_learning_rate, num_data_per_local_update_step, num_local_updates to server

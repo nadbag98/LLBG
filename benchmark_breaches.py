@@ -15,6 +15,7 @@ import breaching
 
 import os
 from collections import OrderedDict
+from math import ceil
 from breaching.cases.models.model_preparation import VisionContainer
 
 os.environ["HYDRA_FULL_ERROR"] = "0"
@@ -116,7 +117,10 @@ def main_launcher(cfg):
     launch_time = time.time()
     if cfg.seed is None:
         cfg.seed = 233  # The benchmark seed is fixed by default!
-
+    if cfg.case.user.user_type == "local_update":
+        # we split data evenly across mini-batches
+        cfg.case.user.num_data_per_local_update_step = ceil(cfg.case.data.batch_size / cfg.case.user.num_local_updates)
+    
     log.info(OmegaConf.to_yaml(cfg))
     breaching.utils.initialize_multiprocess_log(cfg)  # manually save log configuration
     main_process(0, 1, cfg)
