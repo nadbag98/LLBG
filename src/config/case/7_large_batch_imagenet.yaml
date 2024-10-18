@@ -1,0 +1,15 @@
+name: large_batch_imagenet
+
+defaults:
+  - data: ImageNet
+  - impl: default_windows
+  - server: honest-but-curious
+  - user: local_updates
+  - _self_
+model: VGG19
+
+# Server and user:
+num_queries: 1
+
+user:
+  num_data_points: 100
