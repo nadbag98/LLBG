@@ -11,12 +11,12 @@ import datetime
 import time
 import logging
 
-import breaching
+import src
 
 import os
 from collections import OrderedDict
 from math import ceil
-from breaching.cases.models.model_preparation import VisionContainer
+from src.cases.models.model_preparation import VisionContainer
 
 os.environ["HYDRA_FULL_ERROR"] = "0"
 log = logging.getLogger(__name__)
@@ -25,15 +25,15 @@ log = logging.getLogger(__name__)
 def main_process(process_idx, local_group_size, cfg, num_trials=100):
     """This function controls the central routine."""
     total_time = time.time()  # Rough time measurements here
-    setup = breaching.utils.system_startup(process_idx, local_group_size, cfg)
-    model, loss_fn = breaching.cases.construct_model(cfg.case.model, cfg.case.data, cfg.case.server.pretrained)
+    setup = src.utils.system_startup(process_idx, local_group_size, cfg)
+    model, loss_fn = src.cases.construct_model(cfg.case.model, cfg.case.data, cfg.case.server.pretrained)
 
     if cfg.num_trials is not None:
         num_trials = cfg.num_trials
 
-    server = breaching.cases.construct_server(model, loss_fn, cfg.case, setup)
+    server = src.cases.construct_server(model, loss_fn, cfg.case, setup)
     model = server.vet_model(model)
-    attacker = breaching.attacks.prepare_attack(model, loss_fn, cfg.attack, setup, cfg.case.model, cfg.case.data.name)
+    attacker = src.attacks.prepare_attack(model, loss_fn, cfg.attack, setup, cfg.case.model, cfg.case.data.name)
     if cfg.case.user.user_idx is not None:
         print("The argument user_idx is disregarded during the benchmark. Data selection is fixed.")
     log.info(
@@ -48,7 +48,7 @@ def main_process(process_idx, local_group_size, cfg, num_trials=100):
         # Select data that has not been seen before:
         cfg.case.user.user_idx += 1
         try:
-            user = breaching.cases.construct_user(model, loss_fn, cfg.case, setup)
+            user = src.cases.construct_user(model, loss_fn, cfg.case, setup)
         except ValueError:
             log.info("Cannot find other valid users. Finishing benchmark.")
             break
@@ -72,7 +72,7 @@ def main_process(process_idx, local_group_size, cfg, num_trials=100):
                 )
 
                 # Run the full set of metrics:
-                metrics = breaching.analysis.report(
+                metrics = src.analysis.report(
                     reconstruction,
                     true_user_data,
                     payloads,
@@ -88,26 +88,26 @@ def main_process(process_idx, local_group_size, cfg, num_trials=100):
                 metrics["queries"] = user.counted_queries
 
                 # Save local summary:
-                breaching.utils.save_summary(cfg, metrics, stats, time.time() - local_time, original_cwd=False)
+                src.utils.save_summary(cfg, metrics, stats, time.time() - local_time, original_cwd=False)
                 overall_metrics.append(metrics)
                 # Save recovered data:
                 if cfg.save_reconstruction:
-                    breaching.utils.save_reconstruction(reconstruction, payloads, true_user_data, cfg)
+                    src.utils.save_reconstruction(reconstruction, payloads, true_user_data, cfg)
                 if cfg.dryrun:
                     break
             except Exception as e:  # noqa # yeah we're that close to the deadlines
                 log.info(f"Trial {run} broke down with error {e}.")
 
     # Compute average statistics:
-    average_metrics = breaching.utils.avg_n_dicts(overall_metrics)
+    average_metrics = src.utils.avg_n_dicts(overall_metrics)
 
     # Save global summary:
-    breaching.utils.save_summary(
+    src.utils.save_summary(
         cfg, average_metrics, stats, time.time() - total_time, original_cwd=True, table_name="BENCHMARK_breach"
     )
 
 
-@hydra.main(config_path="breaching/config", config_name="cfg", version_base="1.1")
+@hydra.main(config_path="src/config", config_name="cfg", version_base="1.1")
 def main_launcher(cfg):
     """This is boiler-plate code for the launcher."""
 
@@ -122,7 +122,7 @@ def main_launcher(cfg):
         cfg.case.user.num_data_per_local_update_step = ceil(cfg.case.data.batch_size / cfg.case.user.num_local_updates)
     
     log.info(OmegaConf.to_yaml(cfg))
-    breaching.utils.initialize_multiprocess_log(cfg)  # manually save log configuration
+    src.utils.initialize_multiprocess_log(cfg)  # manually save log configuration
     main_process(0, 1, cfg)
 
     log.info("-------------------------------------------------------------")

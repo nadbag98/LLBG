@@ -194,7 +194,7 @@ def _construct_vision_model(cfg_model, cfg_data, pretrained=True, **kwargs):
             )
             if pretrained:
                 # load model weights from file
-                path = f"/home/sharifm/students/nadavgat/breaching/{cfg_model.lower()}.pth"
+                path = f"{cfg_model.lower()}.pth"
                 model.load_state_dict(torch.load(path))
         elif "linear" in cfg_model:
             input_dim = cfg_data.shape[0] * cfg_data.shape[1] * cfg_data.shape[2]

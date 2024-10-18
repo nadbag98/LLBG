@@ -2,18 +2,18 @@ import torchvision
 from torchvision.models import resnet50, googlenet
 # from torchvision.models import convnext_tiny, ConvNeXt_Tiny_Weights
 import torch
-from breaching.cases import construct_dataloader
+from src.cases import construct_dataloader
 import hydra
 from omegaconf import OmegaConf
-from breaching.cases.data.datasets_vision import _build_dataset_vision
-from breaching.cases.data.data_preparation import construct_dataloader
+from src.cases.data.datasets_vision import _build_dataset_vision
+from src.cases.data.data_preparation import construct_dataloader
 import pickle
-from breaching.cases.models.model_preparation import _construct_vision_model
+from src.cases.models.model_preparation import _construct_vision_model
 
 device = torch.device(f"cuda:0")
 #device = torch.device("cpu")
 
-@hydra.main(config_path="breaching/config", config_name="cfg", version_base="1.1")
+@hydra.main(config_path="src/config", config_name="cfg", version_base="1.1")
 def main_launcher(cfg):
     _default_t = torchvision.transforms.ToTensor()
     cfg.case.data.partition = "unique-class"

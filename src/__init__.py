@@ -1,9 +1,9 @@
-"""Initialize breaching library :>"""
+"""Initialize src library :>"""
 
-from breaching import analysis
-from breaching import attacks
-from breaching import cases
-from breaching import utils
+from src import analysis
+from src import attacks
+from src import cases
+from src import utils
 
 __all__ = ["analysis", "attacks", "cases", "servers", "utils"]
 
@@ -38,5 +38,5 @@ def get_case_config(case="1_single_image_small", overrides=[]):
 
 
 # Variant (other OS?):
-# with hydra.initialize_config_module(config_module="breaching.config"):
+# with hydra.initialize_config_module(config_module="src.config"):
 #     cfg = hydra.compose(config_name="cfg", overrides=overrides)

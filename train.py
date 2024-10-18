@@ -8,16 +8,13 @@ import datetime
 import time
 import logging
 
-import breaching
+import src
 from collections import OrderedDict
 import argparse
 
 import os
-from breaching.cases.models.model_preparation import _construct_vision_model
-from breaching.cases.models.vgg import VGG
-
-# os.environ["HYDRA_FULL_ERROR"] = "0"
-# log = logging.getLogger(__name__)
+from src.cases.models.model_preparation import _construct_vision_model
+from src.cases.models.vgg import VGG
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -84,15 +81,17 @@ def test(model, test_loader, criterion, device):
     return test_loss, test_acc
 
 def main():
-    # add argparser for num_epochs, learning rate, weight decay
+    # assumes model being trained is a VGG model, as this is
+    # the only cases needed for our experiments
     parser = argparse.ArgumentParser()
+    parser.add_argument("--model_name", type=str, default="VGG11")
     parser.add_argument("--num_epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=0.00001)
     parser.add_argument("--weight_decay", type=float, default=0.0005)
     args = parser.parse_args()
 
     model = VGG(
-                    "VGG11",
+                    args.model_name,
                     in_channels=3,
                     num_classes=100,
                     norm="BatchNorm2d",
@@ -104,25 +103,7 @@ def main():
                     use_bias=True,
                 )
 
-    model = torch.nn.Sequential(
-                OrderedDict(
-                    [
-                        ("conv1", torch.nn.Conv2d(3, 32, 3, stride=2, padding=1)),
-                        ("relu0", torch.nn.LeakyReLU()),
-                        ("conv2", torch.nn.Conv2d(32, 64, 3, stride=1, padding=1)),
-                        ("relu1", torch.nn.LeakyReLU()),
-                        ("conv3", torch.nn.Conv2d(64, 128, 3, stride=2, padding=1)),
-                        ("relu2", torch.nn.LeakyReLU()),
-                        ("conv4", torch.nn.Conv2d(128, 256, 3, stride=1, padding=1)),
-                        ("relu3", torch.nn.LeakyReLU()),
-                        ("flatt", torch.nn.Flatten()),
-                        ("linear0", torch.nn.Linear(16384, 12544)),
-                        ("relu4", torch.nn.LeakyReLU()),
-                        ("linear1", torch.nn.Linear(12544, 100, bias=True)),
-                    ]
-                )
-            )
-    path = f"cnn_beyond_bias_lr{args.lr}_wd{args.weight_decay}.pth"
+    path = f"{args.model_name.lower()}.pth"
 
     # try loading weights from pretrained model
     model.to(device)
@@ -162,92 +143,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# def train(cfg):
-#     """This function controls the central routine."""
-#     total_time = time.time()  # Rough time measurements here
-#     setup = breaching.utils.system_startup(0, 1, cfg)
-#     model, loss_fn = breaching.cases.construct_model(cfg.case.model, cfg.case.data, cfg.case.server.pretrained)
-#     # load cifar100 data into train_loader and test_loader, from torch
-#     train_loader = torch.utils.data.DataLoader(
-#         dataset=torchvision.datasets.CIFAR100(
-#             root='./data', train=True, download=True, transform=torchvision.transforms.ToTensor()
-#         ),
-#         batch_size=64,
-#         shuffle=True
-#     )
-
-
-#     # train_loader, test_loader = breaching.cases.construct_dataloader(cfg.case, setup)
-#     optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
-
-#     #move model to device
-#     model.to(device)
-
-#     # train model
-#     model.train()
-#     for i in range(NUM_EPOCHS):
-#         for batch_idx, (data, target) in enumerate(train_loader):
-#             # move data to device
-#             data, target = data.to(device), target.to(device)
-#             output = model(data)
-#             loss = loss_fn(output, target)
-#             loss.backward()
-#             optimizer.step()
-#             optimizer.zero_grad()
-#             if batch_idx % 100 == 0:
-#                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-#                    i, batch_idx * len(data), len(train_loader.dataset),
-#                    100. * batch_idx / len(train_loader), loss.item()))
-    
-#     # save model
-#     torch.save(model.state_dict(), 'model.pth')
-#     return model
-
-# def test(cfg, model):
-#     """This function controls the central routine."""
-#     total_time = time.time()  # Rough time measurements here
-#     setup = breaching.utils.system_startup(0, 1, cfg)
-#     model, loss_fn = _construct_vision_model(cfg.case.model, cfg.case.data, cfg.case.server.pretrained)
-#     # load test data into test_loader, from torch
-#     test_loader = torch.utils.data.DataLoader(
-#         dataset=torchvision.datasets.CIFAR100(
-#             root='./data', train=False, download=True, transform=torchvision.transforms.ToTensor()
-#         ),
-#         batch_size=64,
-#         shuffle=True
-#     )
-    
-
-#     optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
-
-#     #move model to device
-#     model.to(device)
-
-#     # test model
-#     model.eval()
-#     test_loss = 0
-#     correct = 0
-#     with torch.no_grad():
-#         for data, target in test_loader:
-#             # move data to device
-#             data, target = data.to(device), target.to(device)
-#             output = model(data)
-#             test_loss += loss_fn(output, target).item()
-#             pred = output.argmax(dim=1, keepdim=True)
-#             correct += pred.eq(target.view_as(pred)).sum().item()
-    
-#     test_loss /= len(test_loader.dataset)
-#     print('Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)'.format(
-#        test_loss, correct, len(test_loader.dataset),
-#        100. * correct / len(test_loader.dataset)))
-    
-
-# @hydra.main(config_path="breaching/config", config_name="my_cfg", version_base="1.1")
-# def main_launcher(cfg):
-#     model = train(cfg)
-#     test(cfg, model)
-
-
-# if __name__ == "__main__":
-#     main_launcher()

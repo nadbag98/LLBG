@@ -11,7 +11,7 @@ import datetime
 import time
 import logging
 
-import breaching
+import src
 
 import os
 
@@ -22,22 +22,22 @@ log = logging.getLogger(__name__)
 def main_process(process_idx, local_group_size, cfg):
     """This function controls the central routine."""
     local_time = time.time()
-    setup = breaching.utils.system_startup(process_idx, local_group_size, cfg)
+    setup = src.utils.system_startup(process_idx, local_group_size, cfg)
 
     # Propose a model architecture:
     # (Replace this line with your own model if you want)
-    model, loss_fn = breaching.cases.construct_model(cfg.case.model, cfg.case.data, cfg.case.server.pretrained)
+    model, loss_fn = src.cases.construct_model(cfg.case.model, cfg.case.data, cfg.case.server.pretrained)
 
     # Instantiate server and vet model
     # This is a no-op for an honest-but-curious server, but a malicious-model server can modify the model in this step.
-    server = breaching.cases.construct_server(model, loss_fn, cfg.case, setup)
+    server = src.cases.construct_server(model, loss_fn, cfg.case, setup)
     model = server.vet_model(model)
 
     # Instantiate user and attacker
-    user = breaching.cases.construct_user(model, loss_fn, cfg.case, setup)
-    attacker = breaching.attacks.prepare_attack(model, loss_fn, cfg.attack, setup, cfg.case.model, cfg.case.data.name)
+    user = src.cases.construct_user(model, loss_fn, cfg.case, setup)
+    attacker = src.attacks.prepare_attack(model, loss_fn, cfg.attack, setup, cfg.case.model, cfg.case.data.name)
     # Summarize startup:
-    breaching.utils.overview(server, user, attacker)
+    src.utils.overview(server, user, attacker)
 
     # Simulate a simple FL protocol
     shared_user_data, payloads, true_user_data = server.run_protocol(user)
@@ -46,19 +46,19 @@ def main_process(process_idx, local_group_size, cfg):
     reconstructed_user_data, stats = attacker.reconstruct(payloads, shared_user_data, server.secrets, dryrun=cfg.dryrun)
 
     # How good is the reconstruction?
-    metrics = breaching.analysis.report(
+    metrics = src.analysis.report(
         reconstructed_user_data, true_user_data, payloads, model, cfg_case=cfg.case, setup=setup
     )
 
     # Save to summary:
-    breaching.utils.save_summary(cfg, metrics, stats, user.counted_queries, time.time() - local_time)
+    src.utils.save_summary(cfg, metrics, stats, user.counted_queries, time.time() - local_time)
     # Save to output folder:
-    breaching.utils.dump_metrics(cfg, metrics)
+    src.utils.dump_metrics(cfg, metrics)
     if cfg.save_reconstruction:
-        breaching.utils.save_reconstruction(reconstructed_user_data, payloads, true_user_data, cfg)
+        src.utils.save_reconstruction(reconstructed_user_data, payloads, true_user_data, cfg)
 
 
-@hydra.main(config_path="breaching/config", config_name="cfg", version_base="1.1")
+@hydra.main(config_path="src/config", config_name="cfg", version_base="1.1")
 def main_launcher(cfg):
     """This is boiler-plate code for the launcher."""
 
@@ -70,7 +70,7 @@ def main_launcher(cfg):
         cfg.seed = torch.randint(0, 2**32 - 1, (1,)).item()
 
     log.info(OmegaConf.to_yaml(cfg))
-    breaching.utils.initialize_multiprocess_log(cfg)  # manually save log configuration
+    src.utils.initialize_multiprocess_log(cfg)  # manually save log configuration
     main_process(0, 1, cfg)
 
     log.info("-------------------------------------------------------------")
