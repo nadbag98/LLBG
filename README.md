@@ -1,10 +1,8 @@
 # Harmful Bias: A General Label-Leakage Attack on Federated Learning from Bias Gradients
 
-This repository is based on the Breaching repository created by Geiping et al., that can be found [here](https://github.com/JonasGeiping/breaching).
-It contains the code for the Label Leakage from Bias Gradients (LLBG) attack (link to paper [here](https://mahmoods01.github.io/files/aisec24-label-leakage.pdf)), and only files and code from the original repo to experiment with this attack.
+This repo--based on Geiping et al.'s excellent [breaching repo](https://github.com/JonasGeiping/breaching)--contains the code for the [Label Leakage from Bias Gradients (LLBG) attack](https://mahmoods01.github.io/files/aisec24-label-leakage.pdf). 
 
-Also included are the baselines used - random label reconstruction attack, and different variants of the Label Leakage from Gradients (LLG) attack suggested by Wainakh et al.
-The only data reconstruction attack that appears in this repository is the "Inverting Gradients" attack suggested by Geiping et al. (link to paper [here](https://proceedings.neurips.cc/paper/2020/file/c4ede56bbd98819ae6112b20ac6bf145-Paper.pdf)), as it is the one we experiment with in our paper.
+Also included are the baselines we used: random label-reconstruction attack and different variants of Wainakh et al.'s Label Leakage from Gradients (LLG) attack. The only data reconstruction attack that appears in this repository is the [Inverting Gradients attack](https://proceedings.neurips.cc/paper/2020/file/c4ede56bbd98819ae6112b20ac6bf145-Paper.pdf), as it is the one we experiment with in our paper.
 
 ### Setup
 The environment for the code may be set up by running:
@@ -14,7 +12,7 @@ conda activate LLBG
 ```
 
 ### Datasets
-Our experiments are run on 2 image datasets:
+Our experiments are run on two image datasets:
 
 1. `ImageNet` - you will need to download the *ImageNet ILSVRC2012* dataset **manually**. However, almost all attacks require only the small validation set. 
 
@@ -22,12 +20,9 @@ Our experiments are run on 2 image datasets:
 
 The default locations for the data is `~/data/imagenet` and `~/data/`, respectively, but this can be changed by adding `case.data.path=path` to the command line when running experiments.
 
-In order to reproduce the experiment results from our paper, 
-below are the specific commands needed to recreate each table.
-The full experiment results will appear in the "tables" 
-directory.
-
 ### Experiment reproduction
+
+You can use the following commands to reproduce experimental results from the paper. The full results will appear in the `tables/`  directory.
 
 Table #1, Untrained `CIFAR100` models:
 ```
@@ -106,10 +101,12 @@ As mentioned above, we use the Breaching repository by Geiping et al. as a base 
 For the license of our code, refer to `LICENCE.md`.
 
 ### Citation
-To cite our paper use the following:
+Please use the following `bib` entry to cite our paper:
+```
 @inproceedings{Gat24LLBG,
   author = {Gat, Nadav and Sharif, Mahmood},
   title = {Harmful Bias: {A} General Label-Leakage Attack on Federated Learning from Bias Gradients},
   booktitle = {ACM Workshop on Artificial Intelligence and Security ({AISec})},
   year = {2024}
 }
+```
